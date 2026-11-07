@@ -1,0 +1,56 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 800 600" width="800" height="600">
+  <rect width="800" height="600" fill="#FFFFFF"/>
+  <rect x="20" y="20" width="760" height="560" fill="#F6F5F2" stroke="#111111" stroke-width="6"/>
+  <!-- Decorative Tactile Grid Marks -->
+  <circle cx="50" cy="50" r="6" fill="#111111"/>
+  <circle cx="750" cy="50" r="6" fill="#111111"/>
+  <circle cx="50" cy="550" r="6" fill="#111111"/>
+  <circle cx="750" cy="550" r="6" fill="#111111"/>
+  
+  <!-- Backdrop Shapes (Acid Coral & Electric Yellow) -->
+  <circle cx="480" cy="270" r="170" fill="#FF4D4D" stroke="#111111" stroke-width="6"/>
+  <polygon points="160,420 320,160 420,380" fill="#FACC15" stroke="#111111" stroke-width="6"/>
+  
+  <!-- Character Body (Hooded / Slick Mischievous) -->
+  <path d="M 300,560 C 300,430 350,370 410,370 C 470,370 530,430 530,560 Z" fill="#111111" stroke="#111111" stroke-width="8"/>
+  <path d="M 370,410 L 410,470 L 450,410" fill="none" stroke="#FF4D4D" stroke-width="6"/>
+  
+  <!-- Face (Winking / sly grin) -->
+  <circle cx="410" cy="260" r="80" fill="#FFE0BD" stroke="#111111" stroke-width="8"/>
+  <!-- Dark Hood / Hair framing -->
+  <path d="M 330,260 C 330,150 490,150 490,260 C 470,210 430,200 410,200 C 380,200 350,210 330,260 Z" fill="#111111"/>
+  
+  <!-- Winking Sly Eyes -->
+  <path d="M 370,255 Q 385,245 400,255" fill="none" stroke="#111111" stroke-width="6" stroke-linecap="round"/>
+  <circle cx="445" cy="255" r="8" fill="#111111"/>
+  <!-- Smirk -->
+  <path d="M 390,295 Q 420,315 440,290" fill="none" stroke="#111111" stroke-width="5" stroke-linecap="round"/>
+
+  <!-- Theatrical Mask in Left Hand -->
+  <g transform="translate(200, 220) rotate(-15)">
+    <path d="M 40,20 C 40,-30 140,-30 140,20 C 140,90 90,140 90,140 C 90,140 40,90 40,20 Z" fill="#FFFFFF" stroke="#111111" stroke-width="6"/>
+    <!-- Smiling Eyes on Mask -->
+    <path d="M 60,35 Q 75,20 90,35" fill="none" stroke="#FF4D4D" stroke-width="5"/>
+    <path d="M 100,35 Q 115,20 130,35" fill="none" stroke="#FF4D4D" stroke-width="5"/>
+    <!-- Big Theatrical Grin on Mask -->
+    <path d="M 65,70 Q 95,110 125,70" fill="#FF4D4D" stroke="#111111" stroke-width="4"/>
+    <!-- Rosy Cheeks -->
+    <circle cx="65" cy="55" r="8" fill="#FF4D4D" opacity="0.6"/>
+    <circle cx="125" cy="55" r="8" fill="#FF4D4D" opacity="0.6"/>
+  </g>
+
+  <!-- Glowing Smartphone in Right Hand -->
+  <rect x="460" y="380" width="90" height="150" rx="16" fill="#111111" stroke="#111111" stroke-width="6"/>
+  <rect x="470" y="395" width="70" height="120" rx="8" fill="#FF4D4D"/>
+  <circle cx="505" cy="455" r="14" fill="#FACC15"/>
+  <path d="M 495,455 L 515,455" stroke="#111111" stroke-width="4"/>
+
+  <!-- Neo-Brutalist Badge -->
+  <rect x="60" y="60" width="190" height="45" fill="#FF4D4D" stroke="#111111" stroke-width="4"/>
+  <text x="155" y="90" font-family="monospace" font-size="20" font-weight="900" fill="#FFFFFF" text-anchor="middle">CATFISHER</text>
+  
+  <!-- Dialogue Pill -->
+  <rect x="180" y="470" width="240" height="50" rx="12" fill="#FFFFFF" stroke="#111111" stroke-width="4"/>
+  <text x="300" y="502" font-family="sans-serif" font-size="16" font-weight="700" fill="#111111" text-anchor="middle">"Can you spot the lie?"</text>
+</svg>
+

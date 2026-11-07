@@ -1,0 +1,29 @@
+{
+  "rules": {
+    "users": {
+      "$uid": {
+        ".read": "true",
+        ".write": "$uid === auth.uid || auth == null"
+      }
+    },
+    "queue": {
+      ".read": "true",
+      ".write": "true",
+      "$uid": {
+        ".indexOn": ["joinedAt", "matchedRoomId"]
+      }
+    },
+    "rooms": {
+      ".read": "true",
+      ".write": "true",
+      "$roomId": {
+        "messages": {
+          ".read": "true",
+          ".write": "true",
+          ".indexOn": ["timestamp"]
+        }
+      }
+    }
+  }
+}
+
