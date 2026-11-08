@@ -36,7 +36,7 @@ export interface MatchSession {
   cancel: () => Promise<void>;
 }
 
-// Local bus fallback for multi-tab testing if live Firebase not reachable
+// Local bus fallback for multi-tab testing
 const LOCAL_BUS_NAME = 'real_two_player_pond_mesh';
 let localBus: BroadcastChannel | null = null;
 if (typeof window !== 'undefined' && 'BroadcastChannel' in window) {
@@ -45,6 +45,25 @@ if (typeof window !== 'undefined' && 'BroadcastChannel' in window) {
   } catch (e) {
     console.warn('BroadcastChannel unavailable', e);
   }
+}
+
+interface LocalQueueMessage {
+  type: 'POND_JOIN' | 'POND_CLAIM' | 'POND_MSG' | 'POND_HEART' | 'POND_TELEMETRY' | 'POND_END';
+  payload: any;
+  _t?: number;
+}
+
+// Dual transport: sends via BroadcastChannel + storage event for 100% cross-tab reliability
+function broadcastLocalEvent(msg: LocalQueueMessage) {
+  try {
+    localBus?.postMessage(msg);
+  } catch (e) {}
+
+  try {
+    if (typeof window !== 'undefined') {
+      localStorage.setItem('__pond_mesh_sync', JSON.stringify({ ...msg, _t: Date.now() + Math.random() }));
+    }
+  } catch (e) {}
 }
 
 /**
@@ -411,13 +430,8 @@ export async function leaveChatRoom(roomId: string, userId: string): Promise<voi
 }
 
 // =========================================================================
-// REAL TWO-PLAYER MULTI-TAB MESH (Zero-config 2-browser testing fallback)
+// REAL TWO-PLAYER MULTI-TAB MESH (Zero-config 2-tab instant testing)
 // =========================================================================
-
-interface LocalQueueMessage {
-  type: 'POND_JOIN' | 'POND_CLAIM' | 'POND_MSG' | 'POND_HEART' | 'POND_TELEMETRY' | 'POND_END';
-  payload: any;
-}
 
 function getStoredLocalQueue(): Record<string, QueueEntry> {
   if (typeof window === 'undefined') return {};
@@ -445,6 +459,7 @@ function runLocalMultiTabMatchmaking(
   let isCancelled = false;
   const currentQueue = getStoredLocalQueue();
 
+  // Find waiting candidate from other tabs
   const candidateIds = Object.keys(currentQueue).filter((id) => {
     const entry = currentQueue[id];
     if (id === user.uid || entry.status !== 'waiting') return false;
@@ -483,7 +498,8 @@ function runLocalMultiTabMatchmaking(
       secretIdentity: peer.secretRole,
     };
 
-    localBus?.postMessage({
+    // Broadcast claim via BroadcastChannel & localStorage
+    broadcastLocalEvent({
       type: 'POND_CLAIM',
       payload: {
         targetUserId: peerId,
@@ -506,6 +522,7 @@ function runLocalMultiTabMatchmaking(
     };
   }
 
+  // Register self as waiting in shared queue
   currentQueue[user.uid] = {
     uid: user.uid,
     presentedGender: user.presentedGender,
@@ -523,31 +540,49 @@ function runLocalMultiTabMatchmaking(
   };
   saveStoredLocalQueue(currentQueue);
 
-  localBus?.postMessage({
+  broadcastLocalEvent({
     type: 'POND_JOIN',
     payload: { user },
   });
 
-  const handleBusMessage = (event: MessageEvent<LocalQueueMessage>) => {
+  const processIncomingMessage = (msg: LocalQueueMessage) => {
     if (isCancelled) return;
-    const { type, payload } = event.data;
-    if (type === 'POND_CLAIM' && payload.targetUserId === user.uid) {
+    if (msg.type === 'POND_CLAIM' && msg.payload.targetUserId === user.uid) {
       callbacks.onBite();
       callbacks.onStatusUpdate('Bite on the line! Reeling in live partner...');
       setTimeout(() => {
         if (!isCancelled) {
-          callbacks.onMatched(payload.roomId, payload.matchedWith);
+          callbacks.onMatched(msg.payload.roomId, msg.payload.matchedWith);
         }
       }, 1200);
     }
   };
 
-  localBus?.addEventListener('message', handleBusMessage);
+  const busListener = (event: MessageEvent<LocalQueueMessage>) => {
+    processIncomingMessage(event.data);
+  };
+
+  const storageListener = (event: StorageEvent) => {
+    if (event.key === '__pond_mesh_sync' && event.newValue) {
+      try {
+        const parsed = JSON.parse(event.newValue) as LocalQueueMessage;
+        processIncomingMessage(parsed);
+      } catch {}
+    }
+  };
+
+  localBus?.addEventListener('message', busListener);
+  if (typeof window !== 'undefined') {
+    window.addEventListener('storage', storageListener);
+  }
 
   return {
     cancel: async () => {
       isCancelled = true;
-      localBus?.removeEventListener('message', handleBusMessage);
+      localBus?.removeEventListener('message', busListener);
+      if (typeof window !== 'undefined') {
+        window.removeEventListener('storage', storageListener);
+      }
       const q = getStoredLocalQueue();
       delete q[user.uid];
       saveStoredLocalQueue(q);
@@ -560,8 +595,8 @@ function subscribeToLocalRoom(
   currentUserId: string,
   callbacks: RoomSubscriptionCallbacks
 ): () => void {
-  const handler = (event: MessageEvent<LocalQueueMessage>) => {
-    const { type, payload } = event.data;
+  const processIncomingMessage = (msg: LocalQueueMessage) => {
+    const { type, payload } = msg;
     if (payload?.roomId !== roomId) return;
 
     if (type === 'POND_MSG') {
@@ -575,10 +610,29 @@ function subscribeToLocalRoom(
     }
   };
 
-  localBus?.addEventListener('message', handler);
+  const busListener = (event: MessageEvent<LocalQueueMessage>) => {
+    processIncomingMessage(event.data);
+  };
+
+  const storageListener = (event: StorageEvent) => {
+    if (event.key === '__pond_mesh_sync' && event.newValue) {
+      try {
+        const parsed = JSON.parse(event.newValue) as LocalQueueMessage;
+        processIncomingMessage(parsed);
+      } catch {}
+    }
+  };
+
+  localBus?.addEventListener('message', busListener);
+  if (typeof window !== 'undefined') {
+    window.addEventListener('storage', storageListener);
+  }
 
   return () => {
-    localBus?.removeEventListener('message', handler);
+    localBus?.removeEventListener('message', busListener);
+    if (typeof window !== 'undefined') {
+      window.removeEventListener('storage', storageListener);
+    }
   };
 }
 
@@ -591,14 +645,14 @@ function sendLocalChatMessage(roomId: string, senderUid: string, text: string) {
     createdAt: Date.now(),
   };
 
-  localBus?.postMessage({
+  broadcastLocalEvent({
     type: 'POND_MSG',
     payload: { roomId, message },
   });
 }
 
 function toggleLocalMessageHeart(roomId: string, messageId: string, hearted: boolean) {
-  localBus?.postMessage({
+  broadcastLocalEvent({
     type: 'POND_HEART',
     payload: {
       roomId,
@@ -614,7 +668,7 @@ function toggleLocalMessageHeart(roomId: string, messageId: string, hearted: boo
 }
 
 function sendLocalTelemetry(roomId: string, userId: string, isTyping: boolean, backspaces: number) {
-  localBus?.postMessage({
+  broadcastLocalEvent({
     type: 'POND_TELEMETRY',
     payload: {
       roomId,
@@ -626,7 +680,7 @@ function sendLocalTelemetry(roomId: string, userId: string, isTyping: boolean, b
 }
 
 function leaveLocalRoom(roomId: string, userId: string) {
-  localBus?.postMessage({
+  broadcastLocalEvent({
     type: 'POND_END',
     payload: { roomId, endedBy: userId },
   });

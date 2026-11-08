@@ -50,7 +50,7 @@ export function LandingHero({ onAuthenticated }: LandingHeroProps) {
 
   const handleInstantGuestLogin = () => {
     const randomSuffix = Math.floor(100 + Math.random() * 900);
-    const guestUid = `user_${Date.now()}_${randomSuffix}`;
+    const guestUid = `user_${Date.now()}_${randomSuffix}_${Math.random().toString(36).substring(2, 6)}`;
     onAuthenticated({
       uid: guestUid,
       displayName: `Player ${randomSuffix}`,

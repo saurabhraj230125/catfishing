@@ -50,13 +50,14 @@ export default function PondGamePage() {
 
   const matchSessionRef = useRef<MatchSession | null>(null);
 
-  // Client hydration & saved stats restoration
+  // Client hydration & saved stats restoration (isolated per browser tab)
   useEffect(() => {
     setMounted(true);
     try {
-      const saved = localStorage.getItem('__pond_chat_user_profile');
-      if (saved) {
-        const parsed = JSON.parse(saved) as UserProfile;
+      // Prioritize sessionStorage so opening two tabs in the same browser creates two distinct players
+      const tabSaved = sessionStorage.getItem('__pond_chat_tab_profile');
+      if (tabSaved) {
+        const parsed = JSON.parse(tabSaved) as UserProfile;
         setUserProfile(parsed);
         setSecretIdentity(parsed.secretIdentity);
         setAuthAccount({
@@ -68,11 +69,16 @@ export default function PondGamePage() {
     } catch {}
   }, []);
 
-  // Sync profile to localStorage whenever updated
+  // Sync profile to sessionStorage for tab isolation and persist score stats
   const persistUserProfile = (updated: UserProfile) => {
     setUserProfile(updated);
     try {
-      localStorage.setItem('__pond_chat_user_profile', JSON.stringify(updated));
+      sessionStorage.setItem('__pond_chat_tab_profile', JSON.stringify(updated));
+      localStorage.setItem('__pond_chat_stats', JSON.stringify({
+        xp: updated.xp,
+        streak: updated.streak,
+        fishCaught: updated.fishCaught
+      }));
     } catch {}
   };
 
@@ -195,7 +201,7 @@ export default function PondGamePage() {
     setAuthAccount(null);
     setUserProfile(null);
     try {
-      localStorage.removeItem('__pond_chat_user_profile');
+      sessionStorage.removeItem('__pond_chat_tab_profile');
     } catch {}
     setPondState('idle');
     setCurrentStage('stage_1_landing');
