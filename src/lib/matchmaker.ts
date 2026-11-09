@@ -111,7 +111,7 @@ export async function startPondMatchmaking(
         const data = d.data() as QueueEntry;
         if (data.uid === user.uid) return false;
         if (data.status !== 'waiting' || data.roomId) return false;
-        if (ignoreGenderFilter) return true;
+        if (ignoreGenderFilter || data.ignoreGenderFilter) return true;
         return data.presentedGender === oppositeGender;
       });
 
@@ -212,7 +212,7 @@ export async function startPondMatchmaking(
 
       setTimeout(() => {
         callbacks.onMatched(createdRoomId, opponent);
-      }, 1200);
+      }, 1000);
 
       return {
         cancel: async () => {
@@ -242,41 +242,152 @@ export async function startPondMatchmaking(
       secretRole: user.secretIdentity,
       status: 'waiting',
       roomId: null,
+      ignoreGenderFilter: ignoreGenderFilter,
       createdAt: serverTimestamp(),
     };
 
     await setDoc(userQueueDocRef, myQueueEntry);
+
+    // Active sweep while in queue: auto-relaxes filter after 4s so users never wait forever
+    let secondsWaiting = 0;
+    const sweepInterval = setInterval(async () => {
+      if (isCancelled) {
+        clearInterval(sweepInterval);
+        return;
+      }
+      secondsWaiting += 2.5;
+
+      const autoBypassFilter = ignoreGenderFilter || secondsWaiting >= 4.0;
+      if (secondsWaiting >= 4.0 && !ignoreGenderFilter) {
+        callbacks.onStatusUpdate('Pond radar expanded... Matching with ANY active angler!');
+        updateDoc(userQueueDocRef, { ignoreGenderFilter: true }).catch(() => {});
+      }
+
+      try {
+        const sweepQ = query(collection(db, 'pond_queue'), where('status', '==', 'waiting'), limit(10));
+        const sweepSnap = await getDocs(sweepQ);
+        const candidates = sweepSnap.docs.filter((d) => {
+          if (d.id === user.uid) return false;
+          const data = d.data() as QueueEntry;
+          if (data.uid === user.uid) return false;
+          if (data.status !== 'waiting' || data.roomId) return false;
+          if (autoBypassFilter || data.ignoreGenderFilter) return true;
+          return data.presentedGender === oppositeGender;
+        });
+
+        if (candidates.length > 0 && !isCancelled) {
+          const candidateDoc = candidates[0];
+          const candidateRef = doc(db, 'pond_queue', candidateDoc.id);
+          const candidateData = candidateDoc.data() as QueueEntry;
+          const roomId = `room_${Date.now()}_${Math.random().toString(36).substring(2, 7)}`;
+
+          await runTransaction(db, async (tx) => {
+            const freshCand = await tx.get(candidateRef);
+            if (!freshCand.exists()) throw new Error('Partner left');
+            const cData = freshCand.data() as QueueEntry;
+            if (cData.status !== 'waiting' || cData.roomId) throw new Error('Partner claimed');
+
+            const roomRef = doc(db, 'chat_rooms', roomId);
+            const myPublicProfile: PublicPondProfile = {
+              uid: user.uid,
+              displayName: user.displayName,
+              username: user.username,
+              avatar: user.avatar,
+              bio: user.bio,
+              vibes: user.vibes,
+              presentedGender: user.presentedGender,
+              secretIdentity: user.secretIdentity,
+            };
+
+            const partnerPublicProfile: PublicPondProfile = {
+              uid: candidateData.uid,
+              displayName: candidateData.profile.displayName,
+              username: candidateData.profile.username,
+              avatar: candidateData.profile.avatar,
+              bio: candidateData.profile.bio,
+              vibes: candidateData.profile.vibes,
+              presentedGender: candidateData.presentedGender,
+              secretIdentity: candidateData.secretRole,
+            };
+
+            const newRoom: ChatRoomDoc = {
+              id: roomId,
+              player1: myPublicProfile,
+              player2: partnerPublicProfile,
+              status: 'active',
+              createdAt: serverTimestamp(),
+              typingStatus: {
+                [user.uid]: false,
+                [candidateData.uid]: false,
+              },
+              backspaces: {
+                [user.uid]: 0,
+                [candidateData.uid]: 0,
+              },
+            };
+
+            tx.set(roomRef, newRoom);
+            tx.update(candidateRef, { status: 'matched', roomId: roomId });
+            tx.set(userQueueDocRef, { uid: user.uid, status: 'matched', roomId: roomId, updatedAt: serverTimestamp() });
+          });
+
+          clearInterval(sweepInterval);
+          callbacks.onBite();
+          callbacks.onStatusUpdate(`Machhli fas gayi! Connected with @${candidateData.profile.username}...`);
+
+          const opponent: PublicPondProfile = {
+            uid: candidateData.uid,
+            displayName: candidateData.profile.displayName,
+            username: candidateData.profile.username,
+            avatar: candidateData.profile.avatar,
+            bio: candidateData.profile.bio,
+            vibes: candidateData.profile.vibes,
+            presentedGender: candidateData.presentedGender,
+            secretIdentity: candidateData.secretRole,
+          };
+
+          setTimeout(() => {
+            callbacks.onMatched(roomId, opponent);
+          }, 1000);
+        }
+      } catch {
+        // Retry on next cycle
+      }
+    }, 2500);
 
     const unsubscribe = onSnapshot(userQueueDocRef, async (queueSnap) => {
       if (isCancelled || !queueSnap.exists()) return;
       const data = queueSnap.data() as QueueEntry;
 
       if (data.status === 'matched' && data.roomId) {
+        clearInterval(sweepInterval);
         callbacks.onBite();
         callbacks.onStatusUpdate('Bite on the line! Reeling in live partner...');
 
         const roomRef = doc(db, 'chat_rooms', data.roomId);
-        const roomSnap = await getDoc(roomRef);
+        const unsubRoom = onSnapshot(roomRef, (roomSnap) => {
+          if (roomSnap.exists()) {
+            unsubRoom();
+            const room = roomSnap.data() as ChatRoomDoc;
+            const opponent = room.player1.uid === user.uid ? room.player2 : room.player1;
 
-        if (roomSnap.exists()) {
-          const room = roomSnap.data() as ChatRoomDoc;
-          const opponent = room.player1.uid === user.uid ? room.player2 : room.player1;
+            unsubscribe();
+            deleteDoc(userQueueDocRef).catch(() => {});
 
-          unsubscribe();
-          await deleteDoc(userQueueDocRef).catch(() => {});
-
-          setTimeout(() => {
-            if (opponent) {
-              callbacks.onMatched(data.roomId!, opponent);
-            }
-          }, 1200);
-        }
+            setTimeout(() => {
+              if (opponent) {
+                callbacks.onMatched(data.roomId!, opponent);
+              }
+            }, 1000);
+          }
+        });
       }
     });
 
     return {
       cancel: async () => {
         isCancelled = true;
+        clearInterval(sweepInterval);
         unsubscribe();
         await deleteDoc(userQueueDocRef).catch(() => {});
       },

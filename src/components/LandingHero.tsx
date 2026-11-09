@@ -24,13 +24,24 @@ export function LandingHero({ onAuthenticated }: LandingHeroProps) {
     return () => clearInterval(timer);
   }, []);
 
+  const getTabSuffix = () => {
+    if (typeof window === 'undefined') return Math.random().toString(36).substring(2, 6);
+    let tabId = sessionStorage.getItem('__pond_tab_session_id');
+    if (!tabId) {
+      tabId = Math.random().toString(36).substring(2, 6);
+      sessionStorage.setItem('__pond_tab_session_id', tabId);
+    }
+    return tabId;
+  };
+
   const handleGoogleSignIn = async () => {
     setLoading(true);
     setErrorMsg(null);
     try {
       const user = await signInWithGoogle();
+      const tabSuffix = getTabSuffix();
       onAuthenticated({
-        uid: user.uid,
+        uid: `${user.uid}_${tabSuffix}`,
         displayName: user.displayName || 'Angler',
         email: user.email || undefined,
         photoURL: user.photoURL || undefined,
@@ -38,9 +49,12 @@ export function LandingHero({ onAuthenticated }: LandingHeroProps) {
     } catch (err: any) {
       console.warn('Google sign-in popup notice:', err);
       if (err?.code === 'auth/popup-closed-by-user') {
-        setErrorMsg('Sign-in cancelled. Please click again to continue.');
+        setErrorMsg('Sign-in popup was closed. Click below to retry.');
+      } else if (err?.code === 'auth/unauthorized-domain') {
+        setErrorMsg('Authorized domain required in Firebase Console. Connecting as Guest...');
+        handleInstantGuestLogin();
       } else {
-        // Smooth fallback for offline/demo environment testing
+        // Direct fallback to guest for offline or testing purposes
         handleInstantGuestLogin();
       }
     } finally {
@@ -49,50 +63,51 @@ export function LandingHero({ onAuthenticated }: LandingHeroProps) {
   };
 
   const handleInstantGuestLogin = () => {
+    const tabSuffix = getTabSuffix();
     const randomSuffix = Math.floor(100 + Math.random() * 900);
-    const guestUid = `user_${Date.now()}_${randomSuffix}_${Math.random().toString(36).substring(2, 6)}`;
+    const guestUid = `guest_${tabSuffix}_${randomSuffix}`;
     onAuthenticated({
       uid: guestUid,
-      displayName: `Player ${randomSuffix}`,
-      email: `player_${randomSuffix}@pondchat.app`,
+      displayName: `Angler ${randomSuffix}`,
+      email: `angler_${randomSuffix}@pondchat.app`,
       photoURL: `https://api.dicebear.com/7.x/adventurer/svg?seed=Pond${randomSuffix}&backgroundColor=b6e3f4`,
     });
   };
 
   return (
-    <div className="relative z-10 w-full max-w-2xl mx-auto px-4 py-4 sm:py-6 flex flex-col items-center text-center">
+    <div className="relative z-10 w-full max-w-xl mx-auto px-4 py-3 sm:py-5 flex flex-col items-center text-center">
       <motion.div
-        initial={{ opacity: 0, y: 18, scale: 0.98 }}
+        initial={{ opacity: 0, y: 16, scale: 0.98 }}
         animate={{ opacity: 1, y: 0, scale: 1 }}
-        transition={{ duration: 0.45, ease: 'easeOut' }}
+        transition={{ duration: 0.4, ease: 'easeOut' }}
         className="w-full bg-white/95 backdrop-blur-xl rounded-3xl border-2 border-slate-900/10 shadow-[0_20px_50px_rgba(0,131,143,0.16)] p-5 sm:p-7 text-center flex flex-col items-center"
       >
-        {/* Floating Top Tag */}
-        <div className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-gradient-to-r from-amber-100 via-rose-100 to-teal-100 border border-amber-300/60 text-xs font-black text-amber-900 mb-2.5 shadow-sm">
+        {/* Floating Arcade Badge */}
+        <div className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-gradient-to-r from-amber-100 via-rose-100 to-teal-100 border border-amber-300/60 text-xs font-black text-amber-900 mb-2 shadow-xs">
           <Sparkles className="w-3.5 h-3.5 text-amber-600" />
-          <span>BOY-MEETS-GIRL • CATFISH & LOYALTY ROULETTE</span>
+          <span>BOY ↔ GIRL • CATFISH & LOYALTY ROULETTE</span>
         </div>
 
-        {/* Top/Center of Hero Headlines */}
-        <h1 className="text-2xl sm:text-4xl font-black text-slate-900 tracking-tight leading-tight max-w-xl">
-          Fake Rich Boy Banoge ya Loyalty Test Karoge?
+        {/* Punchy Gamified Headline */}
+        <h1 className="text-2xl sm:text-3xl font-black text-slate-900 tracking-tight leading-tight">
+          Pehchano Kaun Hai Screen Ke Peeche?
         </h1>
-        <p className="mt-2 text-xs sm:text-sm text-slate-600 max-w-lg leading-relaxed font-medium">
-          Cast your line into the pond. Chat with real strangers, pull off the ultimate Catfish prank, aur dekho kiska kat-ta hai!
+        <p className="mt-1.5 text-xs sm:text-sm text-slate-600 max-w-md font-medium">
+          Cast your line into the pond. Chat with real strangers, spot the fake rich boy or loyalty test!
         </p>
 
         {/* ========================================================
             CENTER SHOWCASE CARD: VIRAL KYRA & SIMRAN CHAT PREVIEW
             ======================================================== */}
-        <div className="w-full my-4 text-left relative overflow-hidden rounded-2xl border-2 border-slate-200/90 bg-white shadow-md p-3.5 sm:p-4">
+        <div className="w-full my-3.5 text-left relative overflow-hidden rounded-2xl border-2 border-slate-200/90 bg-white shadow-sm p-3.5 sm:p-4">
           {/* Header of Preview Card */}
-          <div className="flex items-center justify-between pb-2.5 mb-3 border-b border-slate-100">
+          <div className="flex items-center justify-between pb-2 mb-2.5 border-b border-slate-100">
             <div className="flex items-center gap-2.5">
               <div className="p-0.5 rounded-full insta-story-ring">
                 <img
                   src="https://api.dicebear.com/7.x/adventurer/svg?seed=Kyra&backgroundColor=ffd5dc"
                   alt="@kyra.singh_"
-                  className="w-9 h-9 rounded-full bg-white p-0.5 object-cover"
+                  className="w-8 h-8 rounded-full bg-white p-0.5 object-cover"
                 />
               </div>
               <div>
@@ -120,16 +135,16 @@ export function LandingHero({ onAuthenticated }: LandingHeroProps) {
           </div>
 
           {/* Messages Stream Sequence */}
-          <div className="space-y-2 text-xs min-h-[175px] flex flex-col justify-end">
+          <div className="space-y-1.5 text-xs min-h-[160px] flex flex-col justify-end">
             {/* Msg 1 (Left - @kyra.singh_) */}
             <AnimatePresence>
               {previewStep >= 1 && (
                 <motion.div
-                  initial={{ opacity: 0, y: 8, scale: 0.95 }}
+                  initial={{ opacity: 0, y: 6, scale: 0.95 }}
                   animate={{ opacity: 1, y: 0, scale: 1 }}
                   className="flex justify-start"
                 >
-                  <div className="bg-[#F3F4F6] text-slate-900 px-3.5 py-2 rounded-2xl rounded-bl-xs max-w-[85%] sm:max-w-[78%] shadow-sm leading-relaxed">
+                  <div className="bg-[#F3F4F6] text-slate-900 px-3 py-1.5 rounded-2xl rounded-bl-xs max-w-[85%] sm:max-w-[78%] shadow-xs leading-relaxed">
                     Oh ye aap ho post mein? Aap toh bahut cool ho 😍
                   </div>
                 </motion.div>
@@ -140,11 +155,11 @@ export function LandingHero({ onAuthenticated }: LandingHeroProps) {
             <AnimatePresence>
               {previewStep >= 2 && (
                 <motion.div
-                  initial={{ opacity: 0, y: 8, scale: 0.95 }}
+                  initial={{ opacity: 0, y: 6, scale: 0.95 }}
                   animate={{ opacity: 1, y: 0, scale: 1 }}
                   className="flex justify-end"
                 >
-                  <div className="insta-chat-gradient text-white px-3.5 py-2 rounded-2xl rounded-br-xs max-w-[85%] sm:max-w-[78%] shadow-sm leading-relaxed">
+                  <div className="insta-chat-gradient text-white px-3 py-1.5 rounded-2xl rounded-br-xs max-w-[85%] sm:max-w-[78%] shadow-xs leading-relaxed">
                     Yes, age 20. Are you single?
                   </div>
                 </motion.div>
@@ -155,11 +170,11 @@ export function LandingHero({ onAuthenticated }: LandingHeroProps) {
             <AnimatePresence>
               {previewStep >= 3 && (
                 <motion.div
-                  initial={{ opacity: 0, y: 8, scale: 0.95 }}
+                  initial={{ opacity: 0, y: 6, scale: 0.95 }}
                   animate={{ opacity: 1, y: 0, scale: 1 }}
                   className="flex justify-start"
                 >
-                  <div className="bg-[#F3F4F6] text-slate-900 px-3.5 py-2 rounded-2xl rounded-bl-xs max-w-[85%] sm:max-w-[78%] shadow-sm leading-relaxed">
+                  <div className="bg-[#F3F4F6] text-slate-900 px-3 py-1.5 rounded-2xl rounded-bl-xs max-w-[85%] sm:max-w-[78%] shadow-xs leading-relaxed">
                     No I have a BF... par aap mujhe pehle nahi mile warna aapko hi bana leti 😭
                   </div>
                 </motion.div>
@@ -170,11 +185,11 @@ export function LandingHero({ onAuthenticated }: LandingHeroProps) {
             <AnimatePresence>
               {previewStep >= 4 && (
                 <motion.div
-                  initial={{ opacity: 0, y: 8, scale: 0.95 }}
+                  initial={{ opacity: 0, y: 6, scale: 0.95 }}
                   animate={{ opacity: 1, y: 0, scale: 1 }}
                   className="flex justify-end"
                 >
-                  <div className="insta-chat-gradient text-white px-3.5 py-2 rounded-2xl rounded-br-xs max-w-[85%] sm:max-w-[78%] shadow-sm leading-relaxed">
+                  <div className="insta-chat-gradient text-white px-3 py-1.5 rounded-2xl rounded-br-xs max-w-[85%] sm:max-w-[78%] shadow-xs leading-relaxed">
                     Accha aapka BF accha nahi hai kya?
                   </div>
                 </motion.div>
@@ -185,11 +200,11 @@ export function LandingHero({ onAuthenticated }: LandingHeroProps) {
             <AnimatePresence>
               {previewStep >= 5 && (
                 <motion.div
-                  initial={{ opacity: 0, y: 8, scale: 0.95 }}
+                  initial={{ opacity: 0, y: 6, scale: 0.95 }}
                   animate={{ opacity: 1, y: 0, scale: 1 }}
                   className="flex justify-start"
                 >
-                  <div className="bg-[#F3F4F6] text-slate-900 px-3.5 py-2 rounded-2xl rounded-bl-xs max-w-[85%] sm:max-w-[78%] shadow-sm leading-relaxed">
+                  <div className="bg-[#F3F4F6] text-slate-900 px-3 py-1.5 rounded-2xl rounded-bl-xs max-w-[85%] sm:max-w-[78%] shadow-xs leading-relaxed">
                     Accha hai par thoda rude hai aur kamata bhi nahi hai 💀
                   </div>
                 </motion.div>
@@ -198,10 +213,10 @@ export function LandingHero({ onAuthenticated }: LandingHeroProps) {
           </div>
 
           {/* Floating Reaction Pill */}
-          <div className="mt-3 pt-2 border-t border-slate-100 flex items-center justify-center">
-            <span className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-gradient-to-r from-emerald-50 via-teal-50 to-indigo-50 border border-teal-200 text-[11px] font-black text-slate-800 shadow-xs">
-              <span>🍀 Dil Garden Garden Ho Raha Hai!</span>
-              <span>|</span>
+          <div className="mt-2.5 pt-2 border-t border-slate-100 flex items-center justify-center">
+            <span className="inline-flex items-center gap-1.5 px-3 py-0.5 rounded-full bg-slate-50 border border-slate-200 text-[10px] font-black text-slate-700">
+              <span>🍀 Dil Garden Garden</span>
+              <span>•</span>
               <span>🤝 Bhaichara On Top</span>
             </span>
           </div>
@@ -210,14 +225,14 @@ export function LandingHero({ onAuthenticated }: LandingHeroProps) {
         {/* ========================================================
             FRONT-AND-CENTER BOTTOM CTA: GOOGLE SIGN-IN BUTTON
             ======================================================== */}
-        <div className="w-full space-y-2.5 pt-1 flex flex-col items-center">
-          {/* Massive Tactile Google Pill Button with subtle glow ring */}
+        <div className="w-full space-y-2 pt-1 flex flex-col items-center">
+          {/* Tactile Google Pill Button with subtle glow ring */}
           <motion.button
-            whileHover={{ scale: 1.03 }}
-            whileTap={{ scale: 0.97 }}
+            whileHover={{ scale: 1.02 }}
+            whileTap={{ scale: 0.98 }}
             onClick={handleGoogleSignIn}
             disabled={loading}
-            className="relative group w-full sm:w-[85%] flex items-center justify-center gap-3 px-6 py-4 rounded-full bg-[#111111] hover:bg-black text-white font-extrabold text-sm sm:text-base shadow-xl transition-all disabled:opacity-50 ring-4 ring-emerald-400/20 hover:ring-emerald-400/40"
+            className="relative group w-full sm:w-[90%] flex items-center justify-center gap-3 px-6 py-3.5 rounded-full bg-[#111111] hover:bg-black text-white font-extrabold text-sm sm:text-base shadow-lg transition-all disabled:opacity-50 ring-4 ring-emerald-400/20 hover:ring-emerald-400/40"
           >
             {/* Google 'G' SVG Icon */}
             <svg className="w-5 h-5 flex-shrink-0" viewBox="0 0 24 24">
@@ -239,19 +254,19 @@ export function LandingHero({ onAuthenticated }: LandingHeroProps) {
               />
             </svg>
             <span className="tracking-wide">
-              {loading ? 'Connecting with Google...' : 'Continue with Google — Start Fishing 🎣'}
+              {loading ? 'Connecting Google...' : 'Continue with Google — Start Fishing 🎣'}
             </span>
             <ArrowRight className="w-4 h-4 ml-1 opacity-70 group-hover:translate-x-1 transition-transform" />
           </motion.button>
 
-          {/* Discrete 1-Click Guest/Test Login for multi-browser testing */}
+          {/* 1-Click Guest Pass */}
           <button
             onClick={handleInstantGuestLogin}
             type="button"
             className="inline-flex items-center gap-1.5 text-xs text-slate-500 hover:text-slate-800 font-semibold py-1 px-3 rounded-full hover:bg-slate-100 transition-colors"
           >
             <Zap className="w-3.5 h-3.5 text-amber-500" />
-            <span>Or quick-enter as Guest for multi-browser testing</span>
+            <span>Or 1-Tap Guest Pass (Instant Test)</span>
           </button>
         </div>
 
@@ -259,8 +274,10 @@ export function LandingHero({ onAuthenticated }: LandingHeroProps) {
           <p className="mt-2 text-xs text-rose-500 font-medium">{errorMsg}</p>
         )}
 
-        <div className="mt-3 text-[11px] text-slate-500 font-semibold">
-          🔒 Real-time Firestore matching • 100% Anonymous • Boy ↔ Girl live connections
+        <div className="mt-2.5 text-[11px] text-slate-500 font-semibold flex items-center justify-center gap-2">
+          <span>🟢 Live Firestore Queue</span>
+          <span>•</span>
+          <span>Anonymous 1-on-1 Chat</span>
         </div>
       </motion.div>
     </div>

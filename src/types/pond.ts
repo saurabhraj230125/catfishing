@@ -41,6 +41,7 @@ export interface QueueEntry {
   secretRole: SecretIdentity;
   status: 'waiting' | 'matched';
   roomId: string | null;
+  ignoreGenderFilter?: boolean;
   createdAt: any;
 }
 
