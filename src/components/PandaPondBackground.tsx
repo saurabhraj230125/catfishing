@@ -149,9 +149,9 @@ export function PandaPondBackground({ pondState }: PandaPondBackgroundProps) {
       {/* ========================================================
           THE FISHING PANDA & WOODEN DOCK (Bottom Left Shore)
           ======================================================== */}
-      <div className="absolute bottom-0 left-0 w-80 sm:w-96 h-80 sm:h-96 z-10">
+      <div className="absolute bottom-0 left-0 w-64 sm:w-80 md:w-96 h-64 sm:h-80 md:h-96 z-10 origin-bottom-left scale-75 sm:scale-90 md:scale-100 transition-transform">
         {/* Wooden Pier Planks */}
-        <div className="absolute bottom-0 left-0 w-64 sm:w-72 h-36 bg-[#8D6E63] border-t-4 border-r-4 border-[#5D4037] shadow-xl transform -skew-x-12">
+        <div className="absolute bottom-0 left-0 w-52 sm:w-64 md:w-72 h-28 sm:h-36 bg-[#8D6E63] border-t-4 border-r-4 border-[#5D4037] shadow-xl transform -skew-x-12">
           {/* Plank lines */}
           <div className="w-full h-full divide-y-2 divide-[#6D4C41] flex flex-col justify-evenly px-2">
             <div className="h-4 border-b border-[#5D4037]/60" />
@@ -159,7 +159,7 @@ export function PandaPondBackground({ pondState }: PandaPondBackgroundProps) {
             <div className="h-4 border-b border-[#5D4037]/60" />
           </div>
           {/* Pier post pillar */}
-          <div className="absolute -right-3 bottom-0 w-6 h-28 bg-[#5D4037] border-l-2 border-[#4E342E]" />
+          <div className="absolute -right-3 bottom-0 w-5 sm:w-6 h-20 sm:h-28 bg-[#5D4037] border-l-2 border-[#4E342E]" />
         </div>
 
         {/* The Cute Stylized SVG Panda */}

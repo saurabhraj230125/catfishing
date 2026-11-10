@@ -207,7 +207,7 @@ export function InstaPondChat({
   };
 
   return (
-    <div className="relative z-10 w-full max-w-lg mx-auto px-2 sm:px-4 py-2 sm:py-4 h-[88dvh] max-h-[760px] flex flex-col">
+    <div className="relative z-10 w-full max-w-lg mx-auto px-2 sm:px-4 py-1 sm:py-3 h-[calc(100dvh-60px)] sm:h-[84dvh] max-h-[760px] flex flex-col">
       <motion.div
         initial={{ opacity: 0, scale: 0.98 }}
         animate={{ opacity: 1, scale: 1 }}
@@ -532,7 +532,7 @@ export function InstaPondChat({
               onChange={handleInputChange}
               onKeyDown={handleKeyDown}
               placeholder={`Message ${opponent.username}...`}
-              className="w-full pl-8 pr-10 py-2 sm:py-2.5 bg-slate-100 hover:bg-slate-200/60 focus:bg-white rounded-full text-xs sm:text-sm text-slate-900 border border-slate-200 focus:outline-none focus:ring-2 focus:ring-purple-500 transition-all font-medium"
+              className="w-full pl-8 pr-10 py-2 sm:py-2.5 bg-slate-100 hover:bg-slate-200/60 focus:bg-white rounded-full text-base sm:text-sm text-slate-900 border border-slate-200 focus:outline-none focus:ring-2 focus:ring-purple-500 transition-all font-medium touch-manipulation"
             />
 
             {inputText.trim() && (

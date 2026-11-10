@@ -406,7 +406,7 @@ export function ProfileEditor({
                 value={displayName}
                 onChange={(e) => setDisplayName(e.target.value)}
                 placeholder={presentedGender === 'boy' ? 'e.g. Kabir Sharma, Dev Rajput' : 'e.g. Kyra Singh, Simran Yadav'}
-                className="w-full px-3 py-2 rounded-xl border border-slate-300 focus:outline-none focus:ring-2 focus:ring-indigo-500 text-xs sm:text-sm font-semibold text-slate-900 bg-white"
+                className="w-full px-3 py-2 sm:py-2.5 rounded-xl border border-slate-300 focus:outline-none focus:ring-2 focus:ring-indigo-500 text-base sm:text-sm font-semibold text-slate-900 bg-white touch-manipulation"
               />
             </div>
 
@@ -423,7 +423,7 @@ export function ProfileEditor({
                 value={username}
                 onChange={(e) => setUsername(e.target.value)}
                 placeholder={presentedGender === 'boy' ? '@kabir_lifts, @dev_richkid' : '@kyra.singh_, @simran_yadav'}
-                className="w-full px-3 py-2 rounded-xl border border-slate-300 focus:outline-none focus:ring-2 focus:ring-indigo-500 text-xs sm:text-sm font-mono font-semibold text-slate-900 bg-white"
+                className="w-full px-3 py-2 sm:py-2.5 rounded-xl border border-slate-300 focus:outline-none focus:ring-2 focus:ring-indigo-500 text-base sm:text-sm font-mono font-semibold text-slate-900 bg-white touch-manipulation"
               />
             </div>
           </div>
@@ -448,7 +448,7 @@ export function ProfileEditor({
                   ? 'e.g. Aap mujhe pehle kyu nahi mile warna aapko hi bana leti ✨'
                   : 'e.g. Yahan imaandari chalta hai babu, test your loyalty ☕'
               }
-              className="w-full px-3 py-2 rounded-xl border border-slate-300 focus:outline-none focus:ring-2 focus:ring-indigo-500 text-xs sm:text-sm text-slate-900 font-medium bg-white"
+              className="w-full px-3 py-2 sm:py-2.5 rounded-xl border border-slate-300 focus:outline-none focus:ring-2 focus:ring-indigo-500 text-base sm:text-sm text-slate-900 font-medium bg-white touch-manipulation"
             />
           </div>
 

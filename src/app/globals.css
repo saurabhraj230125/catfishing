@@ -7,6 +7,11 @@
   --foreground: #0F172A;
 }
 
+html {
+  -webkit-text-size-adjust: 100%;
+  text-size-adjust: 100%;
+}
+
 body {
   color: var(--foreground);
   background-color: var(--background);
@@ -14,6 +19,13 @@ body {
   overflow-x: hidden;
   -webkit-font-smoothing: antialiased;
   -moz-osx-font-smoothing: grayscale;
+  -webkit-tap-highlight-color: transparent;
+  padding-bottom: env(safe-area-inset-bottom);
+}
+
+/* Fast tap response on mobile touchscreens */
+button, input, select, textarea, a {
+  touch-action: manipulation;
 }
 
 /* Instagram Story gradient border */
@@ -25,10 +37,19 @@ body {
   background: linear-gradient(135deg, #7638fa 0%, #a438e8 50%, #d300c5 100%);
 }
 
-/* Custom crisp scrollbar */
+/* Hide scrollbars for horizontal emoji & vibe pills scrollers */
+.no-scrollbar {
+  -ms-overflow-style: none;
+  scrollbar-width: none;
+}
+.no-scrollbar::-webkit-scrollbar {
+  display: none;
+}
+
+/* Custom crisp scrollbar for message feeds */
 ::-webkit-scrollbar {
-  width: 6px;
-  height: 6px;
+  width: 5px;
+  height: 5px;
 }
 
 ::-webkit-scrollbar-track {
