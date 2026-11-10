@@ -4,6 +4,10 @@ import "./globals.css";
 export const metadata: Metadata = {
   title: "CATCH ME IF YOU CAN // Gamified Social Deduction Chat",
   description: "A cozy pond Boy-meets-Girl social deduction chat game. Deceive or Detect!",
+  icons: {
+    icon: "/icon.svg",
+    apple: "/apple-icon.svg",
+  },
 };
 
 export default function RootLayout({
