@@ -4,6 +4,7 @@ import React, { useState, useEffect } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { signInWithGoogle } from '@/lib/firebase';
 import { Sparkles, ArrowRight, Zap } from 'lucide-react';
+import { playCastSound } from '@/lib/soundEffects';
 
 interface LandingHeroProps {
   onAuthenticated: (user: { uid: string; displayName: string; email?: string; photoURL?: string }) => void;
@@ -40,6 +41,7 @@ export function LandingHero({ onAuthenticated }: LandingHeroProps) {
     try {
       const user = await signInWithGoogle();
       const tabSuffix = getTabSuffix();
+      playCastSound();
       onAuthenticated({
         uid: `${user.uid}_${tabSuffix}`,
         displayName: user.displayName || 'Angler',
@@ -63,6 +65,7 @@ export function LandingHero({ onAuthenticated }: LandingHeroProps) {
   };
 
   const handleInstantGuestLogin = () => {
+    playCastSound();
     const tabSuffix = getTabSuffix();
     const randomSuffix = Math.floor(100 + Math.random() * 900);
     const guestUid = `guest_${tabSuffix}_${randomSuffix}`;

@@ -4,6 +4,7 @@ import React, { useState } from 'react';
 import { motion } from 'framer-motion';
 import { SecretIdentity } from '@/types/pond';
 import { Sparkles, ArrowLeft, UserCheck, VenetianMask } from 'lucide-react';
+import { playReactionSound } from '@/lib/soundEffects';
 
 interface IdentitySelectorProps {
   onIdentitySelected: (identity: SecretIdentity) => void;
@@ -52,7 +53,10 @@ export function IdentitySelector({ onIdentitySelected, onBack }: IdentitySelecto
           <motion.div
             whileHover={{ y: -4, scale: 1.01 }}
             whileTap={{ scale: 0.98 }}
-            onClick={() => onIdentitySelected('normal')}
+            onClick={() => {
+              playReactionSound();
+              onIdentitySelected('normal');
+            }}
             className="group cursor-pointer rounded-3xl border-2 border-sky-300 hover:border-sky-500 bg-gradient-to-b from-sky-50/60 via-white to-sky-50/30 p-4 sm:p-5 shadow-sm hover:shadow-xl transition-all flex flex-col justify-between touch-manipulation"
           >
             <div>
@@ -109,7 +113,10 @@ export function IdentitySelector({ onIdentitySelected, onBack }: IdentitySelecto
           <motion.div
             whileHover={{ y: -4, scale: 1.01 }}
             whileTap={{ scale: 0.98 }}
-            onClick={() => onIdentitySelected('catfisher')}
+            onClick={() => {
+              playReactionSound();
+              onIdentitySelected('catfisher');
+            }}
             className="group cursor-pointer rounded-3xl border-2 border-rose-300 hover:border-rose-500 bg-gradient-to-b from-rose-50/60 via-white to-rose-50/30 p-4 sm:p-5 shadow-sm hover:shadow-xl transition-all flex flex-col justify-between touch-manipulation"
           >
             <div>

@@ -16,6 +16,12 @@ import {
   Dices,
   Sparkles
 } from 'lucide-react';
+import { 
+  playDiceRollSound, 
+  playCastSound, 
+  playReactionSound, 
+  triggerHaptic 
+} from '@/lib/soundEffects';
 
 interface ProfileEditorProps {
   initialUid: string;
@@ -39,7 +45,7 @@ const BOY_AVATARS = [
 
 // 8 Distinct Girl Character Avatars
 const GIRL_AVATARS = [
-  { id: 'g1', name: 'Kyra (Insta Model)', url: 'https://api.dicebear.com/7.x/adventurer/svg?seed=KyraInsta&backgroundColor=ffd5dc' },
+  { id: 'g1', name: 'Kyra (Insta Queen)', url: 'https://api.dicebear.com/7.x/adventurer/svg?seed=KyraInsta&backgroundColor=ffd5dc' },
   { id: 'g2', name: 'Simran (Hostel Maggi)', url: 'https://api.dicebear.com/7.x/adventurer/svg?seed=SimranMaggi&backgroundColor=ffdfbf' },
   { id: 'g3', name: 'Ananya (Boho Artist)', url: 'https://api.dicebear.com/7.x/adventurer/svg?seed=AnanyaBoho&backgroundColor=ffd5dc' },
   { id: 'g4', name: 'Kriti (College Chill)', url: 'https://api.dicebear.com/7.x/adventurer/svg?seed=KritiCollege&backgroundColor=c0aede' },
@@ -111,6 +117,8 @@ export function ProfileEditor({
 
   // Gender toggle switches avatar gallery and defaults
   const handleGenderToggle = (newGender: PresentedGender) => {
+    playReactionSound();
+    triggerHaptic('light');
     setPresentedGender(newGender);
     const newGallery = newGender === 'boy' ? BOY_AVATARS : GIRL_AVATARS;
     if (!showCustomAvatarInput) {
@@ -120,6 +128,7 @@ export function ProfileEditor({
 
   // Roll Fun Persona generator for instant inspiration
   const handleRollRandomPersona = () => {
+    playDiceRollSound();
     const list = FUN_PERSONA_ROLLS[presentedGender];
     const pick = list[Math.floor(Math.random() * list.length)];
     setDisplayName(pick.displayName);
@@ -129,6 +138,7 @@ export function ProfileEditor({
   };
 
   const toggleVibe = (vibe: string) => {
+    triggerHaptic('light');
     if (selectedVibes.includes(vibe)) {
       setSelectedVibes(selectedVibes.filter((v) => v !== vibe));
     } else {
@@ -140,6 +150,7 @@ export function ProfileEditor({
 
   const handleSaveAndCast = (e: React.FormEvent) => {
     e.preventDefault();
+    playCastSound();
 
     // Clean or provide defaults if left blank
     const fallbackName = presentedGender === 'boy' ? 'Dev Rajput' : 'Kyra Singh';

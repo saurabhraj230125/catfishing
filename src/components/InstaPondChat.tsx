@@ -29,6 +29,15 @@ import {
   Smile,
   Sparkles
 } from 'lucide-react';
+import {
+  playMessageSendSound,
+  playMessageReceiveSound,
+  playReactionSound,
+  playDiceRollSound,
+  playVictorySound,
+  playCatfishBuzzerSound,
+  triggerHaptic,
+} from '@/lib/soundEffects';
 
 interface InstaPondChatProps {
   roomId: string;
@@ -102,6 +111,10 @@ export function InstaPondChat({
             updated[exists] = newMsg;
             return updated;
           }
+          // Play incoming chime when stranger sends a message
+          if (newMsg.senderUid !== currentUser.uid) {
+            playMessageReceiveSound();
+          }
           return [...prev, newMsg];
         });
       },
@@ -153,28 +166,34 @@ export function InstaPondChat({
     setInputText('');
     backspaceCountRef.current = 0;
 
+    playMessageSendSound();
+
     if (typingTimeoutRef.current) clearTimeout(typingTimeoutRef.current);
     await sendChatMessage(roomId, currentUser.uid, text);
   };
 
   // Double-tap or double-click to heart a message
   const handleDoubleTapMessage = async (msg: ChatMessage) => {
+    playReactionSound();
     await toggleMessageHeart(roomId, msg.id, Boolean(msg.hearted || msg.reaction === '❤️'));
   };
 
   // Add emoji reaction to message
   const handleSelectReaction = async (msgId: string, emoji: string) => {
+    playReactionSound();
     setShowEmojiPickerForMsg(null);
     await setMessageReaction(roomId, msgId, emoji);
   };
 
   // Append emoji to input text
   const handleAppendEmoji = (emoji: string) => {
+    triggerHaptic('light');
     setInputText((prev) => `${prev}${emoji}`);
   };
 
   // Insert Savage Hinglish Line Roulette
   const handleRandomSavageLine = () => {
+    playDiceRollSound();
     const randomPick = SAVAGE_HINGLISH_LINES[Math.floor(Math.random() * SAVAGE_HINGLISH_LINES.length)];
     setInputText(randomPick);
   };
@@ -186,6 +205,12 @@ export function InstaPondChat({
     const actualRole: SecretIdentity = opponent.secretIdentity || 'normal';
     const isCorrect = userGuess === actualRole;
     const xpGained = isCorrect ? 50 : 0;
+
+    if (isCorrect) {
+      playVictorySound();
+    } else {
+      playCatfishBuzzerSound();
+    }
 
     setRevealScore({
       isCorrect,
@@ -259,7 +284,10 @@ export function InstaPondChat({
           {/* Live Guess Switch: Toggle between ✨ Normal & 🎣 Catfisher */}
           <div className="flex items-center gap-1 bg-slate-100 p-1 rounded-full border border-slate-200 text-xs shadow-inner flex-shrink-0">
             <button
-              onClick={() => setUserGuess('normal')}
+              onClick={() => {
+                setUserGuess('normal');
+                playReactionSound();
+              }}
               type="button"
               className={`px-2.5 py-1 rounded-full text-[10px] sm:text-[11px] font-black transition-all ${
                 userGuess === 'normal'
@@ -271,7 +299,10 @@ export function InstaPondChat({
               ✨ Asli
             </button>
             <button
-              onClick={() => setUserGuess('catfisher')}
+              onClick={() => {
+                setUserGuess('catfisher');
+                playReactionSound();
+              }}
               type="button"
               className={`px-2.5 py-1 rounded-full text-[10px] sm:text-[11px] font-black transition-all ${
                 userGuess === 'catfisher'

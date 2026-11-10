@@ -17,6 +17,7 @@ import { IdentitySelector } from '@/components/IdentitySelector';
 import { ProfileEditor } from '@/components/ProfileEditor';
 import { MatchmakingRadar } from '@/components/MatchmakingRadar';
 import { InstaPondChat } from '@/components/InstaPondChat';
+import { playCastSound, playBiteSound } from '@/lib/soundEffects';
 
 export default function PondGamePage() {
   const [mounted, setMounted] = useState(false);
@@ -174,6 +175,7 @@ export default function PondGamePage() {
     setPondState('casting');
     setIsBite(false);
     setActiveRoom(null);
+    playCastSound();
     setMatchStatusText(
       bypassGender
         ? 'Fishing in the pond... Searching for ANY live player...'
@@ -195,6 +197,7 @@ export default function PondGamePage() {
           onBite: () => {
             setIsBite(true);
             setPondState('bite');
+            playBiteSound();
           },
           onMatched: (roomId, opponent) => {
             setActiveRoom({ roomId, opponent });
