@@ -7,11 +7,12 @@ import { UserProfile } from '@/types/pond';
 
 interface TopHudProps {
   userProfile: UserProfile | null;
+  authAccount?: { displayName?: string; photoURL?: string; email?: string } | null;
   onSignOut?: () => void;
   onResetIdentity?: () => void;
 }
 
-export function TopHud({ userProfile, onSignOut }: TopHudProps) {
+export function TopHud({ userProfile, authAccount, onSignOut }: TopHudProps) {
   return (
     <header className="relative z-20 w-full px-4 sm:px-8 py-3 flex items-center justify-between">
       {/* Brand Logo & Tagline */}
@@ -47,7 +48,7 @@ export function TopHud({ userProfile, onSignOut }: TopHudProps) {
         </div>
 
         {/* User Stats if Logged In */}
-        {userProfile && (
+        {userProfile ? (
           <>
             {/* Fish Caught Badge */}
             <div className="hidden sm:flex items-center gap-1.5 bg-white/95 backdrop-blur-md px-3 py-1.5 rounded-full border border-slate-200/80 shadow-sm text-xs font-semibold text-slate-700">
@@ -90,7 +91,33 @@ export function TopHud({ userProfile, onSignOut }: TopHudProps) {
               )}
             </div>
           </>
-        )}
+        ) : authAccount ? (
+          <div className="flex items-center gap-1.5 bg-white/95 backdrop-blur-md pl-2 pr-2 py-1 rounded-full border border-slate-200/80 shadow-sm">
+            {authAccount.photoURL ? (
+              <img
+                src={authAccount.photoURL}
+                alt="Account"
+                className="w-6 h-6 rounded-full border border-slate-200 object-cover"
+              />
+            ) : (
+              <div className="w-6 h-6 rounded-full bg-indigo-500 text-white text-[10px] font-bold flex items-center justify-center">
+                {authAccount.displayName?.charAt(0) || 'U'}
+              </div>
+            )}
+            <span className="hidden sm:inline-block text-xs font-semibold text-slate-800 max-w-[110px] truncate">
+              {authAccount.displayName}
+            </span>
+            {onSignOut && (
+              <button
+                onClick={onSignOut}
+                title="Sign Out"
+                className="p-1 text-slate-400 hover:text-rose-600 hover:bg-rose-50 rounded-full transition-colors ml-0.5"
+              >
+                <LogOut className="w-3.5 h-3.5" />
+              </button>
+            )}
+          </div>
+        ) : null}
       </div>
     </header>
   );

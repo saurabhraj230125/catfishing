@@ -453,6 +453,7 @@ export function subscribeToChatRoom(
         senderUid: data.senderUid,
         text: data.text,
         hearted: Boolean(data.hearted),
+        reaction: data.reaction || undefined,
         createdAt: data.createdAt,
       });
     });
@@ -506,6 +507,24 @@ export async function toggleMessageHeart(
   const msgRef = doc(db, 'chat_rooms', roomId, 'messages', messageId);
   await updateDoc(msgRef, {
     hearted: !currentHearted,
+    reaction: !currentHearted ? '❤️' : '',
+  }).catch(() => {});
+}
+
+export async function setMessageReaction(
+  roomId: string,
+  messageId: string,
+  emoji: string
+): Promise<void> {
+  if (!isLiveFirebaseConfigured) {
+    setMessageLocalReaction(roomId, messageId, emoji);
+    return;
+  }
+
+  const msgRef = doc(db, 'chat_rooms', roomId, 'messages', messageId);
+  await updateDoc(msgRef, {
+    reaction: emoji,
+    hearted: emoji === '❤️',
   }).catch(() => {});
 }
 
@@ -772,6 +791,24 @@ function toggleLocalMessageHeart(roomId: string, messageId: string, hearted: boo
         senderUid: '',
         text: '',
         hearted,
+        reaction: hearted ? '❤️' : '',
+        createdAt: Date.now(),
+      },
+    },
+  });
+}
+
+function setMessageLocalReaction(roomId: string, messageId: string, emoji: string) {
+  broadcastLocalEvent({
+    type: 'POND_HEART',
+    payload: {
+      roomId,
+      message: {
+        id: messageId,
+        senderUid: '',
+        text: '',
+        hearted: emoji === '❤️',
+        reaction: emoji,
         createdAt: Date.now(),
       },
     },

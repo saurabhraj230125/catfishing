@@ -65,6 +65,7 @@ export interface ChatMessage {
   senderUid: string;
   text: string;
   hearted: boolean;
+  reaction?: string; // Quick reactions: ❤️, 😂, 💀, 🔥, 🚩, 🧢, 🎣
   createdAt: any;
 }
 

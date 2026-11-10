@@ -9,7 +9,7 @@ import {
   PondState 
 } from '@/types/pond';
 import { startPondMatchmaking, MatchSession } from '@/lib/matchmaker';
-import { signOutUser } from '@/lib/firebase';
+import { signOutUser, onAuthStateChanged, auth } from '@/lib/firebase';
 import { PandaPondBackground } from '@/components/PandaPondBackground';
 import { TopHud } from '@/components/TopHud';
 import { LandingHero } from '@/components/LandingHero';
@@ -50,12 +50,17 @@ export default function PondGamePage() {
 
   const matchSessionRef = useRef<MatchSession | null>(null);
 
-  // Client hydration & saved stats restoration (isolated per browser tab)
+  // Client hydration & saved stats restoration (Persistent sign-in across refreshes)
   useEffect(() => {
     setMounted(true);
+    let hasLoadedSession = false;
+
     try {
-      // Prioritize sessionStorage so opening two tabs in the same browser creates two distinct players
+      // 1. Check tab session or permanent localStorage
       const tabSaved = sessionStorage.getItem('__pond_chat_tab_profile');
+      const savedPermanentProfile = localStorage.getItem('__pond_chat_saved_profile');
+      const savedPermanentAuth = localStorage.getItem('__pond_chat_permanent_auth');
+
       if (tabSaved) {
         const parsed = JSON.parse(tabSaved) as UserProfile;
         setUserProfile(parsed);
@@ -64,9 +69,60 @@ export default function PondGamePage() {
           uid: parsed.uid,
           displayName: parsed.displayName,
           email: parsed.email,
+          photoURL: parsed.avatar,
         });
+        setCurrentStage('stage_2_identity_select');
+        hasLoadedSession = true;
+      } else if (savedPermanentProfile) {
+        const parsed = JSON.parse(savedPermanentProfile) as UserProfile;
+        setUserProfile(parsed);
+        setSecretIdentity(parsed.secretIdentity);
+        setAuthAccount({
+          uid: parsed.uid,
+          displayName: parsed.displayName,
+          email: parsed.email,
+          photoURL: parsed.avatar,
+        });
+        setCurrentStage('stage_2_identity_select');
+        hasLoadedSession = true;
+      } else if (savedPermanentAuth) {
+        const parsedAuth = JSON.parse(savedPermanentAuth);
+        setAuthAccount(parsedAuth);
+        setCurrentStage('stage_2_identity_select');
+        hasLoadedSession = true;
       }
-    } catch {}
+    } catch (e) {
+      console.warn('Storage restoration notice:', e);
+    }
+
+    // 2. Firebase live auth listener: remember user so they never have to sign in again
+    const unsubscribe = onAuthStateChanged(auth, (firebaseUser) => {
+      if (firebaseUser) {
+        const tabSuffix = typeof window !== 'undefined'
+          ? (sessionStorage.getItem('__pond_tab_session_id') || Math.random().toString(36).substring(2, 6))
+          : 'live';
+        if (typeof window !== 'undefined') {
+          sessionStorage.setItem('__pond_tab_session_id', tabSuffix);
+        }
+
+        const account = {
+          uid: `${firebaseUser.uid}_${tabSuffix}`,
+          displayName: firebaseUser.displayName || 'Angler',
+          email: firebaseUser.email || undefined,
+          photoURL: firebaseUser.photoURL || undefined,
+        };
+
+        setAuthAccount(account);
+        try {
+          localStorage.setItem('__pond_chat_permanent_auth', JSON.stringify(account));
+        } catch {}
+
+        // If currently on landing stage, automatically bypass landing stage!
+        setCurrentStage((prev) => (prev === 'stage_1_landing' ? 'stage_2_identity_select' : prev));
+      }
+    });
+
+    return () => unsubscribe();
   }, []);
 
   // Sync profile to sessionStorage for tab isolation and persist score stats
@@ -74,6 +130,7 @@ export default function PondGamePage() {
     setUserProfile(updated);
     try {
       sessionStorage.setItem('__pond_chat_tab_profile', JSON.stringify(updated));
+      localStorage.setItem('__pond_chat_saved_profile', JSON.stringify(updated));
       localStorage.setItem('__pond_chat_stats', JSON.stringify({
         xp: updated.xp,
         streak: updated.streak,
@@ -85,6 +142,9 @@ export default function PondGamePage() {
   // Stage 1 -> Stage 2: Handled on Authentication
   const handleAuthenticated = (user: { uid: string; displayName: string; email?: string; photoURL?: string }) => {
     setAuthAccount(user);
+    try {
+      localStorage.setItem('__pond_chat_permanent_auth', JSON.stringify(user));
+    } catch {}
     setCurrentStage('stage_2_identity_select');
     setPondState('idle');
   };
@@ -202,6 +262,9 @@ export default function PondGamePage() {
     setUserProfile(null);
     try {
       sessionStorage.removeItem('__pond_chat_tab_profile');
+      sessionStorage.removeItem('__pond_tab_session_id');
+      localStorage.removeItem('__pond_chat_permanent_auth');
+      localStorage.removeItem('__pond_chat_saved_profile');
     } catch {}
     setPondState('idle');
     setCurrentStage('stage_1_landing');
@@ -223,7 +286,8 @@ export default function PondGamePage() {
       {/* Persistent Top HUD (Brand Logo, Stats & Online Badge) */}
       <TopHud
         userProfile={userProfile}
-        onSignOut={userProfile ? handleSignOut : undefined}
+        authAccount={authAccount}
+        onSignOut={authAccount || userProfile ? handleSignOut : undefined}
       />
 
       {/* Main Game Stage Flow */}
