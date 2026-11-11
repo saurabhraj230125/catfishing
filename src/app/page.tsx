@@ -17,6 +17,7 @@ import { IdentitySelector } from '@/components/IdentitySelector';
 import { ProfileEditor } from '@/components/ProfileEditor';
 import { MatchmakingRadar } from '@/components/MatchmakingRadar';
 import { InstaPondChat } from '@/components/InstaPondChat';
+import { SiteFooter } from '@/components/SiteFooter';
 import { playCastSound, playBiteSound } from '@/lib/soundEffects';
 import { trackEvent } from '@/lib/analytics';
 
@@ -351,6 +352,9 @@ export default function PondGamePage() {
           />
         )}
       </main>
+
+      {/* Trust & Legal Footer for AdSense Compliance */}
+      {currentStage === 'stage_1_landing' && <SiteFooter />}
     </div>
   );
 }

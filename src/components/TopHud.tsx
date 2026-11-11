@@ -1,8 +1,9 @@
 'use client';
 
 import React, { useState, useEffect } from 'react';
+import Link from 'next/link';
 import { motion } from 'framer-motion';
-import { Flame, Fish, LogOut, Sparkles, Volume2, VolumeX, Download } from 'lucide-react';
+import { Flame, Fish, LogOut, Sparkles, Volume2, VolumeX, Download, BookOpen } from 'lucide-react';
 import { UserProfile } from '@/types/pond';
 import { isSoundMuted, toggleSoundMute, playReactionSound } from '@/lib/soundEffects';
 import { InstallAppModal } from '@/components/InstallAppModal';
@@ -52,6 +53,16 @@ export function TopHud({ userProfile, authAccount, onSignOut }: TopHudProps) {
             </span>
           </div>
         </motion.div>
+
+        {/* Quick Guide Link for Players & Reviewers */}
+        <Link
+          href="/how-to-play"
+          title="Game Rules & Guide"
+          className="hidden lg:flex items-center gap-1.5 bg-white/95 backdrop-blur-md px-3 py-1.5 rounded-full border border-slate-200/90 shadow-xs text-xs font-bold text-slate-700 hover:text-teal-700 hover:border-teal-300 transition-all touch-manipulation"
+        >
+          <BookOpen className="w-3.5 h-3.5 text-teal-600" />
+          <span className="text-[10px] font-extrabold uppercase tracking-wider">How to Play</span>
+        </Link>
       </div>
 
       {/* Right HUD Controls */}
