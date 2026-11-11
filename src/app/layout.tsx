@@ -1,12 +1,19 @@
 import type { Metadata, Viewport } from "next";
 import "./globals.css";
+import { GoogleAnalytics } from "@/components/GoogleAnalytics";
 
 export const metadata: Metadata = {
   title: "CATCH ME IF YOU CAN // Gamified Social Deduction Chat",
   description: "A cozy pond Boy-meets-Girl social deduction chat game. Deceive or Detect!",
+  manifest: "/manifest.json",
   icons: {
     icon: "/icon.svg",
     apple: "/apple-icon.svg",
+  },
+  appleWebApp: {
+    capable: true,
+    statusBarStyle: "default",
+    title: "Catch Me",
   },
 };
 
@@ -25,6 +32,7 @@ export default function RootLayout({
   return (
     <html lang="en">
       <body className="bg-[#E0F7FA] text-slate-900 min-h-screen antialiased selection:bg-teal-300 selection:text-slate-900">
+        <GoogleAnalytics />
         {children}
       </body>
     </html>

@@ -38,6 +38,7 @@ import {
   playCatfishBuzzerSound,
   triggerHaptic,
 } from '@/lib/soundEffects';
+import { trackEvent } from '@/lib/analytics';
 
 interface InstaPondChatProps {
   roomId: string;
@@ -167,6 +168,7 @@ export function InstaPondChat({
     backspaceCountRef.current = 0;
 
     playMessageSendSound();
+    trackEvent('chat_message_sent', { roomId });
 
     if (typingTimeoutRef.current) clearTimeout(typingTimeoutRef.current);
     await sendChatMessage(roomId, currentUser.uid, text);
@@ -175,6 +177,7 @@ export function InstaPondChat({
   // Double-tap or double-click to heart a message
   const handleDoubleTapMessage = async (msg: ChatMessage) => {
     playReactionSound();
+    trackEvent('chat_message_hearted');
     await toggleMessageHeart(roomId, msg.id, Boolean(msg.hearted || msg.reaction === '❤️'));
   };
 
@@ -182,6 +185,7 @@ export function InstaPondChat({
   const handleSelectReaction = async (msgId: string, emoji: string) => {
     playReactionSound();
     setShowEmojiPickerForMsg(null);
+    trackEvent('chat_reaction_selected', { emoji });
     await setMessageReaction(roomId, msgId, emoji);
   };
 
@@ -194,6 +198,7 @@ export function InstaPondChat({
   // Insert Savage Hinglish Line Roulette
   const handleRandomSavageLine = () => {
     playDiceRollSound();
+    trackEvent('chat_savage_line_roulette');
     const randomPick = SAVAGE_HINGLISH_LINES[Math.floor(Math.random() * SAVAGE_HINGLISH_LINES.length)];
     setInputText(randomPick);
   };
@@ -205,6 +210,8 @@ export function InstaPondChat({
     const actualRole: SecretIdentity = opponent.secretIdentity || 'normal';
     const isCorrect = userGuess === actualRole;
     const xpGained = isCorrect ? 50 : 0;
+
+    trackEvent('chat_truth_revealed', { isCorrect, guess: userGuess, actualRole });
 
     if (isCorrect) {
       playVictorySound();

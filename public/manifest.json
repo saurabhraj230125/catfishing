@@ -1,0 +1,24 @@
+{
+  "name": "Catch Me If You Can - Pond Chat",
+  "short_name": "Catch Me",
+  "description": "A cozy pond Boy-meets-Girl social deduction chat game. Deceive or Detect!",
+  "start_url": "/",
+  "display": "standalone",
+  "background_color": "#E0F7FA",
+  "theme_color": "#06B6D4",
+  "orientation": "portrait",
+  "icons": [
+    {
+      "src": "/icon.svg",
+      "sizes": "512x512",
+      "type": "image/svg+xml",
+      "purpose": "any"
+    },
+    {
+      "src": "/apple-icon.svg",
+      "sizes": "512x512",
+      "type": "image/svg+xml",
+      "purpose": "maskable"
+    }
+  ]
+}

@@ -3,8 +3,10 @@
 import React, { useState, useEffect } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { signInWithGoogle } from '@/lib/firebase';
-import { Sparkles, ArrowRight, Zap } from 'lucide-react';
-import { playCastSound } from '@/lib/soundEffects';
+import { Sparkles, ArrowRight, Zap, Download } from 'lucide-react';
+import { playCastSound, playReactionSound } from '@/lib/soundEffects';
+import { trackEvent } from '@/lib/analytics';
+import { InstallAppModal } from '@/components/InstallAppModal';
 
 interface LandingHeroProps {
   onAuthenticated: (user: { uid: string; displayName: string; email?: string; photoURL?: string }) => void;
@@ -13,6 +15,7 @@ interface LandingHeroProps {
 export function LandingHero({ onAuthenticated }: LandingHeroProps) {
   const [loading, setLoading] = useState(false);
   const [errorMsg, setErrorMsg] = useState<string | null>(null);
+  const [isInstallModalOpen, setIsInstallModalOpen] = useState(false);
 
   // Auto-playing Kyra & Simran Hinglish Viral Chat Preview Sequence (Step 1 to 5)
   const [previewStep, setPreviewStep] = useState(1);
@@ -20,7 +23,7 @@ export function LandingHero({ onAuthenticated }: LandingHeroProps) {
   useEffect(() => {
     const timer = setInterval(() => {
       setPreviewStep((prev) => (prev >= 5 ? 1 : prev + 1));
-    }, 2600);
+    }, 2400);
 
     return () => clearInterval(timer);
   }, []);
@@ -38,10 +41,13 @@ export function LandingHero({ onAuthenticated }: LandingHeroProps) {
   const handleGoogleSignIn = async () => {
     setLoading(true);
     setErrorMsg(null);
+    trackEvent('login_google_click');
+
     try {
       const user = await signInWithGoogle();
       const tabSuffix = getTabSuffix();
       playCastSound();
+      trackEvent('login_google_success', { uid: user.uid });
       onAuthenticated({
         uid: `${user.uid}_${tabSuffix}`,
         displayName: user.displayName || 'Angler',
@@ -66,6 +72,7 @@ export function LandingHero({ onAuthenticated }: LandingHeroProps) {
 
   const handleInstantGuestLogin = () => {
     playCastSound();
+    trackEvent('login_guest_click');
     const tabSuffix = getTabSuffix();
     const randomSuffix = Math.floor(100 + Math.random() * 900);
     const guestUid = `guest_${tabSuffix}_${randomSuffix}`;
@@ -77,16 +84,22 @@ export function LandingHero({ onAuthenticated }: LandingHeroProps) {
     });
   };
 
+  const handleOpenInstallModal = () => {
+    playReactionSound();
+    trackEvent('hero_install_app_clicked');
+    setIsInstallModalOpen(true);
+  };
+
   return (
-    <div className="relative z-10 w-full max-w-xl mx-auto px-3 sm:px-4 py-2 sm:py-4 flex flex-col items-center text-center">
+    <div className="relative z-10 w-full max-w-xl mx-auto px-3 sm:px-4 py-1 sm:py-3 flex flex-col items-center text-center">
       <motion.div
-        initial={{ opacity: 0, y: 16, scale: 0.98 }}
+        initial={{ opacity: 0, y: 14, scale: 0.98 }}
         animate={{ opacity: 1, y: 0, scale: 1 }}
-        transition={{ duration: 0.4, ease: 'easeOut' }}
-        className="w-full bg-white/95 backdrop-blur-xl rounded-3xl border-2 border-slate-900/10 shadow-[0_20px_50px_rgba(0,131,143,0.16)] p-4 sm:p-7 text-center flex flex-col items-center"
+        transition={{ duration: 0.35, ease: 'easeOut' }}
+        className="w-full bg-white/95 backdrop-blur-xl rounded-3xl border-2 border-slate-900/10 shadow-[0_20px_50px_rgba(0,131,143,0.16)] p-4 sm:p-6 text-center flex flex-col items-center"
       >
         {/* Floating Arcade Badge */}
-        <div className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-gradient-to-r from-amber-100 via-rose-100 to-teal-100 border border-amber-300/60 text-[10px] sm:text-xs font-black text-amber-900 mb-2 shadow-xs">
+        <div className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-gradient-to-r from-amber-100 via-rose-100 to-teal-100 border border-amber-300/60 text-[10px] sm:text-xs font-black text-amber-900 mb-1.5 shadow-xs">
           <Sparkles className="w-3.5 h-3.5 text-amber-600 flex-shrink-0" />
           <span>BOY ↔ GIRL • CATFISH & LOYALTY ROULETTE</span>
         </div>
@@ -95,148 +108,22 @@ export function LandingHero({ onAuthenticated }: LandingHeroProps) {
         <h1 className="text-xl sm:text-3xl font-black text-slate-900 tracking-tight leading-tight">
           Pehchano Kaun Hai Screen Ke Peeche?
         </h1>
-        <p className="mt-1.5 text-xs sm:text-sm text-slate-600 max-w-md font-medium leading-relaxed">
+        <p className="mt-1 text-xs sm:text-sm text-slate-600 max-w-md font-medium leading-relaxed">
           Cast your line into the pond. Chat with real strangers, spot the fake rich boy or loyalty test!
         </p>
 
         {/* ========================================================
-            CENTER SHOWCASE CARD: VIRAL KYRA & SIMRAN CHAT PREVIEW
+            PRIMARY CALL TO ACTION: SIGN IN WITH GOOGLE (HIGH UP ON SCREEN)
             ======================================================== */}
-        <div className="w-full my-3 text-left relative overflow-hidden rounded-2xl border-2 border-slate-200/90 bg-white shadow-xs p-3 sm:p-4">
-          {/* Header of Preview Card */}
-          <div className="flex items-center justify-between pb-2 mb-2 border-b border-slate-100">
-            <div className="flex items-center gap-2 sm:gap-2.5">
-              <div className="p-0.5 rounded-full insta-story-ring flex-shrink-0">
-                <img
-                  src="https://api.dicebear.com/7.x/adventurer/svg?seed=Kyra&backgroundColor=ffd5dc"
-                  alt="@kyra.singh_"
-                  className="w-7 h-7 sm:w-8 sm:h-8 rounded-full bg-white p-0.5 object-cover"
-                />
-              </div>
-              <div>
-                <div className="flex items-center gap-1.5">
-                  <span className="font-extrabold text-xs sm:text-sm text-slate-900">
-                    @kyra.singh_
-                  </span>
-                  <span className="relative flex h-2 w-2">
-                    <span className="relative inline-flex rounded-full h-2 w-2 bg-emerald-500"></span>
-                  </span>
-                </div>
-                <div className="flex items-center gap-1.5 text-[10px] text-slate-500 font-semibold">
-                  <span className="bg-rose-50 text-rose-700 px-1.5 py-0.2 rounded border border-rose-200">
-                    @simran_yadav
-                  </span>
-                  <span>•</span>
-                  <span className="text-emerald-600 font-bold">🟢 Online</span>
-                </div>
-              </div>
-            </div>
-
-            <span className="text-[9px] sm:text-[10px] uppercase font-bold text-slate-400 tracking-wider">
-              Live Preview
-            </span>
-          </div>
-
-          {/* Messages Stream Sequence */}
-          <div className="space-y-1.5 text-xs min-h-[150px] sm:min-h-[160px] flex flex-col justify-end">
-            {/* Msg 1 (Left - @kyra.singh_) */}
-            <AnimatePresence>
-              {previewStep >= 1 && (
-                <motion.div
-                  initial={{ opacity: 0, y: 6, scale: 0.95 }}
-                  animate={{ opacity: 1, y: 0, scale: 1 }}
-                  className="flex justify-start"
-                >
-                  <div className="bg-[#F3F4F6] text-slate-900 px-3 py-1.5 rounded-2xl rounded-bl-xs max-w-[85%] sm:max-w-[78%] shadow-xs leading-relaxed text-xs">
-                    Oh ye aap ho post mein? Aap toh bahut cool ho 😍
-                  </div>
-                </motion.div>
-              )}
-            </AnimatePresence>
-
-            {/* Msg 2 (Right - You) */}
-            <AnimatePresence>
-              {previewStep >= 2 && (
-                <motion.div
-                  initial={{ opacity: 0, y: 6, scale: 0.95 }}
-                  animate={{ opacity: 1, y: 0, scale: 1 }}
-                  className="flex justify-end"
-                >
-                  <div className="insta-chat-gradient text-white px-3 py-1.5 rounded-2xl rounded-br-xs max-w-[85%] sm:max-w-[78%] shadow-xs leading-relaxed text-xs">
-                    Yes, age 20. Are you single?
-                  </div>
-                </motion.div>
-              )}
-            </AnimatePresence>
-
-            {/* Msg 3 (Left - @kyra.singh_) */}
-            <AnimatePresence>
-              {previewStep >= 3 && (
-                <motion.div
-                  initial={{ opacity: 0, y: 6, scale: 0.95 }}
-                  animate={{ opacity: 1, y: 0, scale: 1 }}
-                  className="flex justify-start"
-                >
-                  <div className="bg-[#F3F4F6] text-slate-900 px-3 py-1.5 rounded-2xl rounded-bl-xs max-w-[85%] sm:max-w-[78%] shadow-xs leading-relaxed text-xs">
-                    No I have a BF... par aap mujhe pehle nahi mile warna aapko hi bana leti 😭
-                  </div>
-                </motion.div>
-              )}
-            </AnimatePresence>
-
-            {/* Msg 4 (Right - You) */}
-            <AnimatePresence>
-              {previewStep >= 4 && (
-                <motion.div
-                  initial={{ opacity: 0, y: 6, scale: 0.95 }}
-                  animate={{ opacity: 1, y: 0, scale: 1 }}
-                  className="flex justify-end"
-                >
-                  <div className="insta-chat-gradient text-white px-3 py-1.5 rounded-2xl rounded-br-xs max-w-[85%] sm:max-w-[78%] shadow-xs leading-relaxed text-xs">
-                    Accha aapka BF accha nahi hai kya?
-                  </div>
-                </motion.div>
-              )}
-            </AnimatePresence>
-
-            {/* Msg 5 (Left - @kyra.singh_) */}
-            <AnimatePresence>
-              {previewStep >= 5 && (
-                <motion.div
-                  initial={{ opacity: 0, y: 6, scale: 0.95 }}
-                  animate={{ opacity: 1, y: 0, scale: 1 }}
-                  className="flex justify-start"
-                >
-                  <div className="bg-[#F3F4F6] text-slate-900 px-3 py-1.5 rounded-2xl rounded-bl-xs max-w-[85%] sm:max-w-[78%] shadow-xs leading-relaxed text-xs">
-                    Accha hai par thoda rude hai aur kamata bhi nahi hai 💀
-                  </div>
-                </motion.div>
-              )}
-            </AnimatePresence>
-          </div>
-
-          {/* Floating Reaction Pill */}
-          <div className="mt-2.5 pt-2 border-t border-slate-100 flex items-center justify-center">
-            <span className="inline-flex items-center gap-1.5 px-3 py-0.5 rounded-full bg-slate-50 border border-slate-200 text-[10px] font-black text-slate-700">
-              <span>🍀 Dil Garden Garden</span>
-              <span>•</span>
-              <span>🤝 Bhaichara On Top</span>
-            </span>
-          </div>
-        </div>
-
-        {/* ========================================================
-            FRONT-AND-CENTER BOTTOM CTA: GOOGLE SIGN-IN BUTTON
-            ======================================================== */}
-        <div className="w-full space-y-2 pt-1 flex flex-col items-center">
-          {/* Tactile Google Pill Button with subtle glow ring */}
+        <div className="w-full my-3 sm:my-3.5 space-y-2 flex flex-col items-center">
+          {/* Tactile Google Pill Button with emerald ring glow */}
           <motion.button
             whileHover={{ scale: 1.02 }}
             whileTap={{ scale: 0.98 }}
             onClick={handleGoogleSignIn}
             disabled={loading}
             type="button"
-            className="relative group w-full sm:w-[90%] flex items-center justify-center gap-2.5 sm:gap-3 px-4 sm:px-6 py-3 sm:py-3.5 rounded-full bg-[#111111] hover:bg-black text-white font-extrabold text-xs sm:text-base shadow-lg transition-all disabled:opacity-50 ring-4 ring-emerald-400/20 hover:ring-emerald-400/40 touch-manipulation"
+            className="relative group w-full sm:w-[94%] flex items-center justify-center gap-2.5 sm:gap-3 px-4 sm:px-6 py-3 sm:py-3.5 rounded-full bg-[#111111] hover:bg-black text-white font-extrabold text-xs sm:text-base shadow-lg transition-all disabled:opacity-50 ring-4 ring-emerald-400/25 hover:ring-emerald-400/40 touch-manipulation cursor-pointer"
           >
             {/* Google 'G' SVG Icon */}
             <svg className="w-4 h-4 sm:w-5 sm:h-5 flex-shrink-0" viewBox="0 0 24 24">
@@ -263,27 +150,171 @@ export function LandingHero({ onAuthenticated }: LandingHeroProps) {
             <ArrowRight className="w-4 h-4 ml-0.5 opacity-70 group-hover:translate-x-1 transition-transform" />
           </motion.button>
 
-          {/* 1-Click Guest Pass */}
-          <button
-            onClick={handleInstantGuestLogin}
-            type="button"
-            className="inline-flex items-center gap-1.5 text-xs text-slate-500 hover:text-slate-800 font-semibold py-1.5 px-3 rounded-full hover:bg-slate-100 transition-colors touch-manipulation"
-          >
-            <Zap className="w-3.5 h-3.5 text-amber-500" />
-            <span>Or 1-Tap Guest Pass (Instant Test)</span>
-          </button>
+          {/* Quick Action Pills: Guest Pass + Install App */}
+          <div className="flex flex-wrap items-center justify-center gap-2 pt-0.5">
+            <button
+              onClick={handleInstantGuestLogin}
+              type="button"
+              className="inline-flex items-center gap-1.5 text-xs text-slate-600 hover:text-slate-900 font-bold py-1 px-3 rounded-full bg-slate-100 hover:bg-slate-200 border border-slate-200/80 transition-colors touch-manipulation cursor-pointer"
+            >
+              <Zap className="w-3.5 h-3.5 text-amber-500" />
+              <span>1-Tap Guest Pass</span>
+            </button>
+
+            <button
+              onClick={handleOpenInstallModal}
+              type="button"
+              className="inline-flex items-center gap-1.5 text-xs text-teal-800 hover:text-teal-950 font-bold py-1 px-3 rounded-full bg-teal-50 hover:bg-teal-100 border border-teal-200/90 transition-colors touch-manipulation cursor-pointer"
+            >
+              <Download className="w-3.5 h-3.5 text-teal-600" />
+              <span>Install App / Icon</span>
+            </button>
+          </div>
         </div>
 
         {errorMsg && (
-          <p className="mt-2 text-xs text-rose-500 font-medium">{errorMsg}</p>
+          <p className="mb-2 text-xs text-rose-500 font-medium">{errorMsg}</p>
         )}
 
+        {/* ========================================================
+            CENTER SHOWCASE: VIRAL KYRA & SIMRAN CHAT PREVIEW (SLEEK & COMPACT)
+            ======================================================== */}
+        <div className="w-full my-1 text-left relative overflow-hidden rounded-2xl border-2 border-slate-200/90 bg-white shadow-xs p-3">
+          {/* Header of Preview Card */}
+          <div className="flex items-center justify-between pb-1.5 mb-1.5 border-b border-slate-100">
+            <div className="flex items-center gap-2">
+              <div className="p-0.5 rounded-full insta-story-ring flex-shrink-0">
+                <img
+                  src="https://api.dicebear.com/7.x/adventurer/svg?seed=Kyra&backgroundColor=ffd5dc"
+                  alt="@kyra.singh_"
+                  className="w-6 h-6 sm:w-7 sm:h-7 rounded-full bg-white p-0.5 object-cover"
+                />
+              </div>
+              <div>
+                <div className="flex items-center gap-1.5">
+                  <span className="font-extrabold text-xs text-slate-900">
+                    @kyra.singh_
+                  </span>
+                  <span className="relative flex h-1.5 w-1.5">
+                    <span className="relative inline-flex rounded-full h-1.5 w-1.5 bg-emerald-500"></span>
+                  </span>
+                </div>
+                <div className="flex items-center gap-1 text-[9px] text-slate-500 font-semibold">
+                  <span className="bg-rose-50 text-rose-700 px-1 py-0.2 rounded border border-rose-200 text-[8px]">
+                    @simran_yadav
+                  </span>
+                  <span>•</span>
+                  <span className="text-emerald-600 font-bold">🟢 Live Pond</span>
+                </div>
+              </div>
+            </div>
+
+            <span className="text-[9px] uppercase font-bold text-slate-400 tracking-wider">
+              Live Preview
+            </span>
+          </div>
+
+          {/* Messages Stream Sequence (Optimized height) */}
+          <div className="space-y-1.5 text-xs min-h-[115px] sm:min-h-[125px] flex flex-col justify-end">
+            {/* Msg 1 (Left - @kyra.singh_) */}
+            <AnimatePresence>
+              {previewStep >= 1 && (
+                <motion.div
+                  initial={{ opacity: 0, y: 5, scale: 0.95 }}
+                  animate={{ opacity: 1, y: 0, scale: 1 }}
+                  className="flex justify-start"
+                >
+                  <div className="bg-[#F3F4F6] text-slate-900 px-2.5 py-1 rounded-xl rounded-bl-xs max-w-[85%] shadow-xs leading-relaxed text-[11px] sm:text-xs">
+                    Oh ye aap ho post mein? Aap toh bahut cool ho 😍
+                  </div>
+                </motion.div>
+              )}
+            </AnimatePresence>
+
+            {/* Msg 2 (Right - You) */}
+            <AnimatePresence>
+              {previewStep >= 2 && (
+                <motion.div
+                  initial={{ opacity: 0, y: 5, scale: 0.95 }}
+                  animate={{ opacity: 1, y: 0, scale: 1 }}
+                  className="flex justify-end"
+                >
+                  <div className="insta-chat-gradient text-white px-2.5 py-1 rounded-xl rounded-br-xs max-w-[85%] shadow-xs leading-relaxed text-[11px] sm:text-xs">
+                    Yes, age 20. Are you single?
+                  </div>
+                </motion.div>
+              )}
+            </AnimatePresence>
+
+            {/* Msg 3 (Left - @kyra.singh_) */}
+            <AnimatePresence>
+              {previewStep >= 3 && (
+                <motion.div
+                  initial={{ opacity: 0, y: 5, scale: 0.95 }}
+                  animate={{ opacity: 1, y: 0, scale: 1 }}
+                  className="flex justify-start"
+                >
+                  <div className="bg-[#F3F4F6] text-slate-900 px-2.5 py-1 rounded-xl rounded-bl-xs max-w-[85%] shadow-xs leading-relaxed text-[11px] sm:text-xs">
+                    No I have a BF... par aap mujhe pehle nahi mile warna aapko hi bana leti 😭
+                  </div>
+                </motion.div>
+              )}
+            </AnimatePresence>
+
+            {/* Msg 4 (Right - You) */}
+            <AnimatePresence>
+              {previewStep >= 4 && (
+                <motion.div
+                  initial={{ opacity: 0, y: 5, scale: 0.95 }}
+                  animate={{ opacity: 1, y: 0, scale: 1 }}
+                  className="flex justify-end"
+                >
+                  <div className="insta-chat-gradient text-white px-2.5 py-1 rounded-xl rounded-br-xs max-w-[85%] shadow-xs leading-relaxed text-[11px] sm:text-xs">
+                    Accha aapka BF accha nahi hai kya?
+                  </div>
+                </motion.div>
+              )}
+            </AnimatePresence>
+
+            {/* Msg 5 (Left - @kyra.singh_) */}
+            <AnimatePresence>
+              {previewStep >= 5 && (
+                <motion.div
+                  initial={{ opacity: 0, y: 5, scale: 0.95 }}
+                  animate={{ opacity: 1, y: 0, scale: 1 }}
+                  className="flex justify-start"
+                >
+                  <div className="bg-[#F3F4F6] text-slate-900 px-2.5 py-1 rounded-xl rounded-bl-xs max-w-[85%] shadow-xs leading-relaxed text-[11px] sm:text-xs">
+                    Accha hai par thoda rude hai aur kamata bhi nahi hai 💀
+                  </div>
+                </motion.div>
+              )}
+            </AnimatePresence>
+          </div>
+
+          {/* Floating Vibe Tags */}
+          <div className="mt-2 pt-1.5 border-t border-slate-100 flex items-center justify-center">
+            <span className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full bg-slate-50 border border-slate-200 text-[9px] font-black text-slate-700">
+              <span>🍀 Dil Garden Garden</span>
+              <span>•</span>
+              <span>🤝 Bhaichara On Top</span>
+            </span>
+          </div>
+        </div>
+
+        {/* Live Queue indicator */}
         <div className="mt-2 text-[10px] sm:text-[11px] text-slate-500 font-semibold flex items-center justify-center gap-2">
           <span>🟢 Live Firestore Queue</span>
           <span>•</span>
           <span>Anonymous 1-on-1 Chat</span>
         </div>
       </motion.div>
+
+      {/* App Install & Icon Download Modal */}
+      <InstallAppModal
+        isOpen={isInstallModalOpen}
+        onClose={() => setIsInstallModalOpen(false)}
+      />
     </div>
   );
 }

@@ -326,3 +326,4 @@ export function playCatfishBuzzerSound() {
     triggerHaptic('medium');
   } catch {}
 }
+

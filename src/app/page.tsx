@@ -18,6 +18,7 @@ import { ProfileEditor } from '@/components/ProfileEditor';
 import { MatchmakingRadar } from '@/components/MatchmakingRadar';
 import { InstaPondChat } from '@/components/InstaPondChat';
 import { playCastSound, playBiteSound } from '@/lib/soundEffects';
+import { trackEvent } from '@/lib/analytics';
 
 export default function PondGamePage() {
   const [mounted, setMounted] = useState(false);
@@ -152,6 +153,7 @@ export default function PondGamePage() {
 
   // Stage 2 -> Stage 3: Handled on Identity Selected (Normal vs Catfisher)
   const handleIdentitySelected = (identity: SecretIdentity) => {
+    trackEvent('role_selected', { role: identity });
     setSecretIdentity(identity);
     setCurrentStage('stage_3_profile_editor');
     setPondState('idle');
@@ -171,6 +173,7 @@ export default function PondGamePage() {
 
   // Stage 4: Trigger Pond Matchmaking
   const triggerMatchmaking = async (profile: UserProfile, bypassGender: boolean = false) => {
+    trackEvent('matchmaking_started', { gender: profile.presentedGender, bypassGender });
     setCurrentStage('stage_4_pond_matchmaking');
     setPondState('casting');
     setIsBite(false);
@@ -198,8 +201,10 @@ export default function PondGamePage() {
             setIsBite(true);
             setPondState('bite');
             playBiteSound();
+            trackEvent('fish_bite_alert');
           },
           onMatched: (roomId, opponent) => {
+            trackEvent('match_connected', { roomId });
             setActiveRoom({ roomId, opponent });
             setPondState('chatting');
             setCurrentStage('stage_5_insta_chat');

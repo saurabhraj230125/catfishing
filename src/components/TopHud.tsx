@@ -2,9 +2,10 @@
 
 import React, { useState, useEffect } from 'react';
 import { motion } from 'framer-motion';
-import { Flame, Fish, LogOut, Sparkles, Volume2, VolumeX } from 'lucide-react';
+import { Flame, Fish, LogOut, Sparkles, Volume2, VolumeX, Download } from 'lucide-react';
 import { UserProfile } from '@/types/pond';
 import { isSoundMuted, toggleSoundMute, playReactionSound } from '@/lib/soundEffects';
+import { InstallAppModal } from '@/components/InstallAppModal';
 
 interface TopHudProps {
   userProfile: UserProfile | null;
@@ -15,6 +16,7 @@ interface TopHudProps {
 
 export function TopHud({ userProfile, authAccount, onSignOut }: TopHudProps) {
   const [muted, setMuted] = useState(false);
+  const [isInstallModalOpen, setIsInstallModalOpen] = useState(false);
 
   useEffect(() => {
     setMuted(isSoundMuted());
@@ -84,6 +86,22 @@ export function TopHud({ userProfile, authAccount, onSignOut }: TopHudProps) {
           )}
           <span className="hidden sm:inline text-[10px] font-extrabold uppercase tracking-wider">
             {muted ? 'SFX Off' : 'SFX On'}
+          </span>
+        </button>
+
+        {/* Install App / Download Icon Button */}
+        <button
+          onClick={() => {
+            playReactionSound();
+            setIsInstallModalOpen(true);
+          }}
+          title="Install Web App or Download Icon"
+          type="button"
+          className="flex items-center gap-1 bg-white/95 backdrop-blur-md px-2 sm:px-2.5 py-1.5 rounded-full border border-slate-200/90 shadow-xs text-xs font-bold text-slate-700 hover:text-cyan-700 hover:border-cyan-300 transition-all touch-manipulation flex-shrink-0"
+        >
+          <Download className="w-3.5 h-3.5 text-cyan-600" />
+          <span className="hidden sm:inline text-[10px] font-extrabold uppercase tracking-wider">
+            App
           </span>
         </button>
 
@@ -162,6 +180,12 @@ export function TopHud({ userProfile, authAccount, onSignOut }: TopHudProps) {
           </div>
         ) : null}
       </div>
+
+      {/* Install App & Download Icon Modal */}
+      <InstallAppModal
+        isOpen={isInstallModalOpen}
+        onClose={() => setIsInstallModalOpen(false)}
+      />
     </header>
   );
 }
