@@ -4,7 +4,7 @@
 export const GA_MEASUREMENT_ID =
   process.env.NEXT_PUBLIC_GA_ID ||
   process.env.NEXT_PUBLIC_FIREBASE_MEASUREMENT_ID ||
-  'G-Y7SX7RYB75';
+  'G-4WB1K6XS9B';
 
 declare global {
   interface Window {
@@ -41,3 +41,4 @@ export function trackEvent(
     console.debug('GA Event tracking error:', err);
   }
 }
+

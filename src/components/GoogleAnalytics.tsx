@@ -1,8 +1,25 @@
 'use client';
 
-import React from 'react';
+import React, { useEffect, Suspense } from 'react';
 import Script from 'next/script';
-import { GA_MEASUREMENT_ID } from '@/lib/analytics';
+import { usePathname, useSearchParams } from 'next/navigation';
+import { GA_MEASUREMENT_ID, trackPageView } from '@/lib/analytics';
+
+function AnalyticsTracker() {
+  const pathname = usePathname();
+  const searchParams = useSearchParams();
+
+  useEffect(() => {
+    if (pathname) {
+      const url = searchParams?.toString()
+        ? `${pathname}?${searchParams.toString()}`
+        : pathname;
+      trackPageView(url);
+    }
+  }, [pathname, searchParams]);
+
+  return null;
+}
 
 export function GoogleAnalytics() {
   if (!GA_MEASUREMENT_ID) return null;
@@ -27,6 +44,9 @@ export function GoogleAnalytics() {
           `,
         }}
       />
+      <Suspense fallback={null}>
+        <AnalyticsTracker />
+      </Suspense>
     </>
   );
 }

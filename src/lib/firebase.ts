@@ -17,7 +17,7 @@ const firebaseConfig = {
   storageBucket: process.env.NEXT_PUBLIC_FIREBASE_STORAGE_BUCKET || "catfisher-61185.firebasestorage.app",
   messagingSenderId: process.env.NEXT_PUBLIC_FIREBASE_MESSAGING_SENDER_ID || "46032951855",
   appId: process.env.NEXT_PUBLIC_FIREBASE_APP_ID || "1:46032951855:web:dfe0993de0edfd9d1bc4da",
-  measurementId: process.env.NEXT_PUBLIC_FIREBASE_MEASUREMENT_ID || "G-Y7SX7RYB75",
+  measurementId: process.env.NEXT_PUBLIC_FIREBASE_MEASUREMENT_ID || "G-4WB1K6XS9B",
 };
 
 // Prevent multiple initializations during Next.js hot-reloading
