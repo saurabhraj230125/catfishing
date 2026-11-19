@@ -27,10 +27,6 @@ export function GoogleAnalytics() {
   return (
     <>
       <Script
-        strategy="afterInteractive"
-        src={`https://www.googletagmanager.com/gtag/js?id=${GA_MEASUREMENT_ID}`}
-      />
-      <Script
         id="google-analytics-init"
         strategy="afterInteractive"
         dangerouslySetInnerHTML={{
@@ -41,6 +37,14 @@ export function GoogleAnalytics() {
             gtag('config', '${GA_MEASUREMENT_ID}', {
               page_path: window.location.pathname,
             });
+            (function() {
+              if (document.getElementById('gtm-script')) return;
+              var s = document.createElement('script');
+              s.id = 'gtm-script';
+              s.async = true;
+              s.src = 'https://www.googletagmanager.com/gtag/js?id=${GA_MEASUREMENT_ID}';
+              document.head.appendChild(s);
+            })();
           `,
         }}
       />

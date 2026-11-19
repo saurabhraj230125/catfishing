@@ -1,0 +1,112 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512" width="512" height="512">
+  <defs>
+    <!-- Background Water Gradient -->
+    <linearGradient id="pondBg" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#22D3EE" />
+      <stop offset="50%" stop-color="#06B6D4" />
+      <stop offset="100%" stop-color="#0284C7" />
+    </linearGradient>
+
+    <!-- Warm Story Pop Accent -->
+    <linearGradient id="instaPop" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#F59E0B" />
+      <stop offset="50%" stop-color="#F43F5E" />
+      <stop offset="100%" stop-color="#8B5CF6" />
+    </linearGradient>
+
+    <!-- Bamboo Gold Gradient -->
+    <linearGradient id="bambooGold" x1="0%" y1="0%" x2="100%" y2="0%">
+      <stop offset="0%" stop-color="#FDE047" />
+      <stop offset="100%" stop-color="#CA8A04" />
+    </linearGradient>
+
+    <!-- Hook Glow Filter -->
+    <filter id="softGlow" x="-20%" y="-20%" width="140%" height="140%">
+      <feDropShadow dx="0" dy="8" stdDeviation="12" flood-color="#0F172A" flood-opacity="0.25" />
+    </filter>
+  </defs>
+
+  <!-- App Icon Squircle Container -->
+  <rect width="512" height="512" rx="120" fill="url(#pondBg)" />
+
+  <!-- Concentric Sunlit Pond Ripples -->
+  <circle cx="256" cy="270" r="190" fill="none" stroke="#FFFFFF" stroke-opacity="0.18" stroke-width="6" />
+  <circle cx="256" cy="270" r="140" fill="none" stroke="#FFFFFF" stroke-opacity="0.28" stroke-width="5" />
+  <circle cx="256" cy="270" r="90" fill="none" stroke="#FFFFFF" stroke-opacity="0.38" stroke-width="4" />
+
+  <!-- Swimming Koi Shadow -->
+  <path d="M120 380 Q150 360 170 385 Q150 400 120 380 Z" fill="#FFFFFF" fill-opacity="0.35" />
+
+  <!-- Stylized Cute Panda Character (Left Pier) -->
+  <g filter="url(#softGlow)">
+    <!-- Panda Left Ear -->
+    <circle cx="150" cy="180" r="32" fill="#1E293B" />
+    <circle cx="150" cy="180" r="18" fill="#F43F5E" fill-opacity="0.3" />
+
+    <!-- Panda Right Ear -->
+    <circle cx="260" cy="180" r="32" fill="#1E293B" />
+    <circle cx="260" cy="180" r="18" fill="#F43F5E" fill-opacity="0.3" />
+
+    <!-- Panda White Head -->
+    <circle cx="205" cy="235" r="72" fill="#FFFFFF" />
+
+    <!-- Panda Straw / Bamboo Headband -->
+    <path d="M135 220 Q205 200 275 220" stroke="#F59E0B" stroke-width="14" stroke-linecap="round" fill="none" />
+    <circle cx="205" cy="208" r="8" fill="#EF4444" />
+
+    <!-- Eye Patches (Iconic Tilted Ovals) -->
+    <ellipse cx="178" cy="238" rx="18" ry="22" transform="rotate(-18 178 238)" fill="#1E293B" />
+    <ellipse cx="232" cy="238" rx="18" ry="22" transform="rotate(18 232 238)" fill="#1E293B" />
+
+    <!-- Cute Pupil Highlights -->
+    <circle cx="176" cy="234" r="6" fill="#FFFFFF" />
+    <circle cx="234" cy="234" r="6" fill="#FFFFFF" />
+
+    <!-- Nose & Mouth -->
+    <ellipse cx="205" cy="262" rx="10" ry="7" fill="#1E293B" />
+    <path d="M198 272 Q205 278 212 272" stroke="#1E293B" stroke-width="3.5" stroke-linecap="round" fill="none" />
+
+    <!-- Panda Body & Paws -->
+    <path d="M145 295 C145 270 265 270 265 295 L275 380 C275 410 135 410 135 380 Z" fill="#FFFFFF" />
+    <!-- Dark Sleeves / Arms Holding Fishing Rod -->
+    <path d="M145 295 Q130 350 200 345" stroke="#1E293B" stroke-width="32" stroke-linecap="round" fill="none" />
+    <path d="M260 295 Q280 340 230 350" stroke="#1E293B" stroke-width="28" stroke-linecap="round" fill="none" />
+  </g>
+
+  <!-- Curved Bamboo Fishing Rod -->
+  <path d="M195 345 Q260 310 330 190 Q370 120 410 100" stroke="url(#bambooGold)" stroke-width="12" stroke-linecap="round" fill="none" filter="url(#softGlow)" />
+  <!-- Bamboo Ring Knots -->
+  <circle cx="260" cy="290" r="7" fill="#854D0E" />
+  <circle cx="330" cy="190" r="6" fill="#854D0E" />
+
+  <!-- Golden Fishing Line Arching Down -->
+  <path d="M410 100 Q430 200 375 280" stroke="#FFFFFF" stroke-opacity="0.9" stroke-width="3" stroke-dasharray="6,4" fill="none" />
+
+  <!-- Glowing Golden Hook Holding the Catfish / Mystery Disguise Mask -->
+  <g transform="translate(375, 280)" filter="url(#softGlow)">
+    <!-- Golden Hook -->
+    <path d="M0 0 L0 30 Q0 55 -25 55 Q-45 55 -45 35 Q-45 20 -30 25" stroke="#FBBF24" stroke-width="7" stroke-linecap="round" fill="none" />
+
+    <!-- Sparkling Secret Catfish Mask Emblem -->
+    <g transform="translate(-15, 60)">
+      <!-- Mask Background Shape -->
+      <path d="M-55 -15 C-45 -35 -15 -25 0 -10 C15 -25 45 -35 55 -15 C65 10 35 30 0 32 C-35 30 -65 10 -55 -15 Z" fill="url(#instaPop)" />
+      
+      <!-- Mask Eye Cutouts -->
+      <ellipse cx="-24" cy="-3" rx="14" ry="9" fill="#06B6D4" transform="rotate(-10 -24 -3)" />
+      <ellipse cx="24" cy="-3" rx="14" ry="9" fill="#06B6D4" transform="rotate(10 24 -3)" />
+
+      <!-- Golden Catfish Whisker / Feather Accents -->
+      <path d="M-52 -5 Q-70 -15 -80 5" stroke="#FDE047" stroke-width="4" stroke-linecap="round" fill="none" />
+      <path d="M52 -5 Q70 -15 80 5" stroke="#FDE047" stroke-width="4" stroke-linecap="round" fill="none" />
+
+      <!-- Center Sparkle Diamond -->
+      <polygon points="0,-18 5,-8 15,-5 5,-2 0,8 -5,-2 -15,-5 -5,-8" fill="#FFFFFF" />
+    </g>
+  </g>
+
+  <!-- Water Splash Droplets -->
+  <circle cx="340" cy="270" r="6" fill="#FFFFFF" fill-opacity="0.8" />
+  <circle cx="410" cy="260" r="4.5" fill="#FFFFFF" fill-opacity="0.8" />
+  <circle cx="380" cy="245" r="3.5" fill="#FFFFFF" fill-opacity="0.9" />
+</svg>
