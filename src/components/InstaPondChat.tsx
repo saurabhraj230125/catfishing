@@ -1,6 +1,6 @@
 'use client';
 
-import React, { useState, useEffect, useRef } from 'react';
+import React, { useState, useEffect, useRef, useCallback } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { 
   UserProfile, 
@@ -17,7 +17,7 @@ import {
   updateTypingTelemetry,
   leaveChatRoom,
 } from '@/lib/matchmaker';
-import { getGuaranteedBotFallback } from '@/lib/botPersonas';
+import { useBotChat } from '@/hooks/useBotChat';
 import { useChatTimer } from '@/hooks/useChatTimer';
 import { PricingModal } from '@/components/PricingModal';
 import { 
@@ -108,11 +108,11 @@ export function InstaPondChat({
   const backspaceCountRef = useRef(0);
   const typingTimeoutRef = useRef<NodeJS.Timeout | null>(null);
 
-  // Bot choreography & debounce refs
-  const botDebounceRef = useRef<NodeJS.Timeout | null>(null);
-  const botTypingTimersRef = useRef<NodeJS.Timeout[]>([]);
-  const botAbortControllerRef = useRef<AbortController | null>(null);
-  const queuedUserMsgsRef = useRef<string[]>([]);
+  // Messages ref to allow stable history access without re-triggering effects
+  const messagesRef = useRef<ChatMessage[]>(messages);
+  useEffect(() => {
+    messagesRef.current = messages;
+  }, [messages]);
 
   // 3-Second "KHATAM HO GAYA BHAIYA MATTER!" Truth Reveal Overlay state
   const [showTruthReveal, setShowTruthReveal] = useState(false);
@@ -147,10 +147,39 @@ export function InstaPondChat({
     },
   });
 
+  const handleAddBotMessage = useCallback((newBotMsg: ChatMessage) => {
+    setMessages((prev) => [...prev, newBotMsg]);
+  }, []);
+
+  const handleSetOpponentTyping = useCallback((typing: { isTyping: boolean; backspaces: number }) => {
+    setOpponentTyping(typing);
+  }, []);
+
+  const handleHeartUserMessage = useCallback((userMsgId: string) => {
+    setMessages((prev) =>
+      prev.map((m) =>
+        m.id === userMsgId ? { ...m, hearted: true, reaction: '❤️' } : m
+      )
+    );
+  }, []);
+
+  const getChatHistory = useCallback(() => messagesRef.current, []);
+
+  // Dedicated butter-smooth bot engine with 850ms debounce and 0 Firestore touch
+  const { queueUserMessage, cancelAllPending } = useBotChat({
+    persona: activeSession.type === 'bot' ? activeSession.partner : null,
+    isActive: activeSession.type === 'bot' && !isOpponentDisconnected && !showTruthReveal,
+    currentUser,
+    onAddBotMessage: handleAddBotMessage,
+    onSetOpponentTyping: handleSetOpponentTyping,
+    onHeartUserMessage: handleHeartUserMessage,
+    getHistory: getChatHistory,
+  });
+
   // 1. DECOUPLED FIRESTORE LISTENER (Guarded strictly for human sessions only)
   useEffect(() => {
     // CRITICAL BUG FIX: Never attach Firestore listeners to bot sessions
-    if (!activeSession || activeSession.type === 'bot') return;
+    if (!activeSession || activeSession.type !== 'human') return;
 
     const unsubscribe = subscribeToChatRoom(roomId, currentUser.uid, {
       onMessage: (newMsg) => {
@@ -183,173 +212,12 @@ export function InstaPondChat({
     };
   }, [roomId, currentUser.uid, activeSession]);
 
-  // 2. STEALTH BOT OPENER (Natural 55% chance drop)
-  useEffect(() => {
-    if (!activeSession || activeSession.type !== 'bot') return;
-    const botPersona = activeSession.partner;
-
-    const shouldOpen = Math.random() < 0.55;
-    if (shouldOpen) {
-      const openers =
-        botPersona.presentedGender === 'girl'
-          ? ['heyy :)', 'kya scene?', 'heyy kahan se ho?', 'sup', 'heyy']
-          : ['yo', 'sup bro', 'kya scene?', 'heyy', 'kahan se ho?'];
-      const randomOpener = openers[Math.floor(Math.random() * openers.length)];
-      const delay = 1300 + Math.random() * 1100;
-
-      const timer = setTimeout(() => {
-        setOpponentTyping({ isTyping: true, backspaces: 0 });
-        const typingDelay = setTimeout(() => {
-          setOpponentTyping({ isTyping: false, backspaces: 0 });
-          const newMsg: ChatMessage = {
-            id: `msg_stealth_${Date.now()}`,
-            senderUid: opponent.uid,
-            text: randomOpener,
-            hearted: false,
-            createdAt: new Date(),
-          };
-          setMessages((prev) => [...prev, newMsg]);
-          playMessageReceiveSound();
-        }, 750 + Math.random() * 400);
-        botTypingTimersRef.current.push(typingDelay);
-      }, delay);
-
-      botTypingTimersRef.current.push(timer);
-    }
-
-    return () => {
-      if (botDebounceRef.current) clearTimeout(botDebounceRef.current);
-      botTypingTimersRef.current.forEach((t) => clearTimeout(t));
-      botTypingTimersRef.current = [];
-      if (botAbortControllerRef.current) {
-        botAbortControllerRef.current.abort();
-      }
-    };
-  }, [activeSession, opponent.uid]);
-
   // Auto-scroll on new message
   useEffect(() => {
     messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
   }, [messages, opponentTyping.isTyping]);
 
-  // 3. EXECUTE BOT REPLY PIPELINE (With 10s AbortController and instant Hinglish fallback)
-  const executeBotReply = async (
-    userText: string,
-    currentHistory: ChatMessage[],
-    userMsgId: string
-  ) => {
-    if (activeSession.type !== 'bot') return;
-    const botPersona = activeSession.partner;
-
-    if (botAbortControllerRef.current) {
-      botAbortControllerRef.current.abort();
-    }
-    const abortController = new AbortController();
-    botAbortControllerRef.current = abortController;
-
-    const pauseTimer = setTimeout(() => {
-      setOpponentTyping({ isTyping: true, backspaces: 0 });
-    }, 450);
-    botTypingTimersRef.current.push(pauseTimer);
-
-    let replyData: {
-      messages: string[];
-      shouldHeartLastUserMsg: boolean;
-      simulateRewrite: boolean;
-    };
-
-    try {
-      const historyPayload = currentHistory.slice(-8).map((m) => ({
-        sender: (m.senderUid === currentUser.uid ? 'user' : 'partner') as 'user' | 'partner',
-        text: m.text,
-      }));
-
-      const timeoutId = setTimeout(() => abortController.abort(), 10000);
-
-      const res = await fetch('/api/stealth-bot', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          persona: botPersona,
-          userGender: currentUser.presentedGender,
-          messages: historyPayload,
-          userMessage: userText,
-        }),
-        signal: abortController.signal,
-      });
-      clearTimeout(timeoutId);
-
-      if (res.ok) {
-        const json = await res.json();
-        const bubbles = Array.isArray(json.messages) && json.messages.length > 0
-          ? json.messages
-          : Array.isArray(json.bubbles) && json.bubbles.length > 0
-          ? json.bubbles
-          : null;
-
-        if (bubbles) {
-          replyData = {
-            messages: bubbles,
-            shouldHeartLastUserMsg: Boolean(json.shouldHeartLastUserMsg),
-            simulateRewrite: Boolean(json.simulateRewrite),
-          };
-        } else {
-          replyData = getGuaranteedBotFallback(userText, botPersona);
-        }
-      } else {
-        replyData = getGuaranteedBotFallback(userText, botPersona);
-      }
-    } catch {
-      replyData = getGuaranteedBotFallback(userText, botPersona);
-    }
-
-    if (abortController.signal.aborted) return;
-
-    // Simulated backspace rewrite tell if flagged
-    if (replyData.simulateRewrite) {
-      setOpponentTyping({ isTyping: true, backspaces: 8 });
-      await new Promise((r) => setTimeout(r, 900 + Math.random() * 400));
-    }
-
-    // Deliver bubbles sequentially
-    for (let i = 0; i < replyData.messages.length; i++) {
-      if (abortController.signal.aborted) return;
-
-      const bubble = replyData.messages[i];
-      setOpponentTyping({ isTyping: true, backspaces: 0 });
-      await new Promise((r) => setTimeout(r, 550 + Math.random() * 500));
-
-      setOpponentTyping({ isTyping: false, backspaces: 0 });
-      const newBotMsg: ChatMessage = {
-        id: `bot_msg_${Date.now()}_${i}`,
-        senderUid: opponent.uid,
-        text: bubble,
-        hearted: false,
-        createdAt: new Date(),
-      };
-      setMessages((prev) => [...prev, newBotMsg]);
-      playMessageReceiveSound();
-
-      if (i < replyData.messages.length - 1) {
-        await new Promise((r) => setTimeout(r, 350 + Math.random() * 300));
-      }
-    }
-
-    // Double-tap heart user's last message if flagged
-    if (replyData.shouldHeartLastUserMsg) {
-      const heartTimer = setTimeout(() => {
-        setMessages((prev) =>
-          prev.map((m) =>
-            m.id === userMsgId ? { ...m, hearted: true, reaction: '❤️' } : m
-          )
-        );
-        playReactionSound();
-      }, 700);
-      botTypingTimersRef.current.push(heartTimer);
-    }
-  };
-
-  // 4. INSTANT OPTIMISTIC SEND + 900ms DEBOUNCED QUEUE
+  // 2. INSTANT OPTIMISTIC SEND + NON-BLOCKING INPUT
   const handleSend = () => {
     if (!inputText.trim() || isExpired || isOpponentDisconnected) return;
     const text = inputText.trim();
@@ -369,22 +237,10 @@ export function InstaPondChat({
     };
 
     // Instant optimistic UI update: never lag or wait
-    const nextHistory = [...messages, userMsg];
-    setMessages(nextHistory);
+    setMessages((prev) => [...prev, userMsg]);
 
     if (activeSession.type === 'bot') {
-      queuedUserMsgsRef.current.push(text);
-
-      // Cancel previous debounce timer and restart fresh 900ms
-      if (botDebounceRef.current) {
-        clearTimeout(botDebounceRef.current);
-      }
-
-      botDebounceRef.current = setTimeout(() => {
-        const combined = queuedUserMsgsRef.current.join(' \n ');
-        queuedUserMsgsRef.current = [];
-        executeBotReply(combined, nextHistory, userMsgId);
-      }, 900);
+      queueUserMessage(text, userMsgId);
     } else {
       if (typingTimeoutRef.current) clearTimeout(typingTimeoutRef.current);
       sendChatMessage(roomId, currentUser.uid, text).catch(() => {});
@@ -470,13 +326,7 @@ export function InstaPondChat({
   // Trigger Skip / Next with "KHATAM HO GAYA BHAIYA MATTER!" Reveal
   const handleTriggerNext = async () => {
     // Clear all bot timeouts immediately so old replies never leak into next room
-    if (botDebounceRef.current) clearTimeout(botDebounceRef.current);
-    botTypingTimersRef.current.forEach((t) => clearTimeout(t));
-    botTypingTimersRef.current = [];
-    if (botAbortControllerRef.current) {
-      botAbortControllerRef.current.abort();
-    }
-    queuedUserMsgsRef.current = [];
+    cancelAllPending();
 
     if (activeSession.type === 'human') {
       await leaveChatRoom(roomId, currentUser.uid).catch(() => {});
@@ -517,11 +367,11 @@ export function InstaPondChat({
   };
 
   return (
-    <div className="relative z-10 w-full max-w-lg mx-auto px-2 sm:px-4 py-1 sm:py-3 h-[calc(100dvh-60px)] sm:h-[84dvh] max-h-[760px] flex flex-col">
+    <div className="relative z-30 pointer-events-auto w-full max-w-lg mx-auto px-2 sm:px-4 py-1 sm:py-3 h-[calc(100dvh-60px)] sm:h-[84dvh] max-h-[760px] flex flex-col">
       <motion.div
         initial={{ opacity: 0, scale: 0.98 }}
         animate={{ opacity: 1, scale: 1 }}
-        className="relative bg-white/95 backdrop-blur-xl rounded-3xl border-2 border-slate-900/10 shadow-[0_20px_50px_rgba(0,131,143,0.18)] flex flex-col flex-1 overflow-hidden"
+        className="relative z-30 pointer-events-auto bg-white/95 backdrop-blur-xl rounded-3xl border-2 border-slate-900/10 shadow-[0_20px_50px_rgba(0,131,143,0.18)] flex flex-col flex-1 overflow-hidden"
       >
         {/* ========================================================
             HEADER: STORY RING AVATAR, TIMER PILL & GUESS SWITCH

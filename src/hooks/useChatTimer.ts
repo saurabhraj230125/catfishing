@@ -25,26 +25,36 @@ export function useChatTimer({
   const [subscription, setSubscription] = useState<UserSubscription | null>(null);
   const [remainingSeconds, setRemainingSeconds] = useState<number>(300);
   const [isExpired, setIsExpired] = useState<boolean>(false);
+  const [isLoaded, setIsLoaded] = useState<boolean>(false);
 
   const secondsRef = useRef<number>(300);
   const lastSavedSecondsRef = useRef<number>(300);
   const expiredTriggeredRef = useRef<boolean>(false);
+  const onTimeExpiredRef = useRef(onTimeExpired);
+
+  useEffect(() => {
+    onTimeExpiredRef.current = onTimeExpired;
+  }, [onTimeExpired]);
 
   // Load initial subscription
   const refreshSubscription = useCallback(async () => {
-    if (!userUid) return;
+    if (!userUid) {
+      setIsLoaded(true);
+      return;
+    }
     try {
       const sub = await getUserSubscription(userUid, userEmail);
       setSubscription(sub);
       setRemainingSeconds(sub.remainingSeconds);
       secondsRef.current = sub.remainingSeconds;
       lastSavedSecondsRef.current = sub.remainingSeconds;
+      setIsLoaded(true);
 
-      if (sub.remainingSeconds === 0 && sub.planTier !== 'unlimited') {
+      if (sub.remainingSeconds <= 0 && sub.planTier !== 'unlimited') {
         setIsExpired(true);
         if (!expiredTriggeredRef.current) {
           expiredTriggeredRef.current = true;
-          onTimeExpired?.();
+          onTimeExpiredRef.current?.();
         }
       } else {
         setIsExpired(false);
@@ -52,8 +62,9 @@ export function useChatTimer({
       }
     } catch (e) {
       console.warn('Timer subscription load error:', e);
+      setIsLoaded(true);
     }
-  }, [userUid, userEmail, onTimeExpired]);
+  }, [userUid, userEmail]);
 
   useEffect(() => {
     refreshSubscription();
@@ -61,10 +72,10 @@ export function useChatTimer({
 
   // Active chat second-by-second countdown
   useEffect(() => {
-    if (!isActive || isExpired) return;
+    if (!isActive || !isLoaded || isExpired) return;
 
     // Unlimited plan never counts down
-    if (subscription?.planTier === 'unlimited' || remainingSeconds === -1) {
+    if (subscription?.planTier === 'unlimited' || secondsRef.current === -1) {
       return;
     }
 
@@ -75,7 +86,10 @@ export function useChatTimer({
           setIsExpired(true);
           if (!expiredTriggeredRef.current) {
             expiredTriggeredRef.current = true;
-            onTimeExpired?.();
+            onTimeExpiredRef.current?.();
+          }
+          if (userUid) {
+            saveUserRemainingSeconds(userUid, 0);
           }
           return 0;
         }
@@ -86,7 +100,9 @@ export function useChatTimer({
         // Periodic sync to Firestore every 10 seconds
         if (Math.abs(lastSavedSecondsRef.current - next) >= 10) {
           lastSavedSecondsRef.current = next;
-          saveUserRemainingSeconds(userUid, next);
+          if (userUid) {
+            saveUserRemainingSeconds(userUid, next);
+          }
         }
 
         return next;
@@ -100,7 +116,7 @@ export function useChatTimer({
         saveUserRemainingSeconds(userUid, secondsRef.current);
       }
     };
-  }, [isActive, isExpired, subscription?.planTier, userUid, onTimeExpired, remainingSeconds]);
+  }, [isActive, isLoaded, isExpired, subscription?.planTier, userUid]);
 
   // Compute urgency level for UI styling
   const planTier: PlanTier = subscription?.planTier || 'free';
@@ -125,6 +141,7 @@ export function useChatTimer({
     urgencyLevel,
     isExpired,
     isUnlimited,
+    isLoaded,
     subscription,
     refreshSubscription,
   };
@@ -141,4 +158,3 @@ function formatTimeRemaining(seconds: number, isUnlimited: boolean): string {
   const ss = String(secs).padStart(2, '0');
   return `${mm}:${ss}`;
 }
-

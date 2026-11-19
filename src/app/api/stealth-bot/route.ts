@@ -69,10 +69,10 @@ Reply as ${persona.username} in strict JSON format:`;
 
         let responseText = '';
 
-        // 1. Try gemini-3.5-flash-lite first
+        // 1. Try gemini-2.5-flash-lite first
         try {
           const res = await ai.models.generateContent({
-            model: 'gemini-3.5-flash-lite',
+            model: 'gemini-2.5-flash-lite',
             contents: prompt,
             config: {
               systemInstruction,
@@ -83,16 +83,20 @@ Reply as ${persona.username} in strict JSON format:`;
           responseText = res.text?.trim() || '';
         } catch (liteErr) {
           // 2. Fallback to gemini-2.5-flash if lite is unavailable
-          const res = await ai.models.generateContent({
-            model: 'gemini-2.5-flash',
-            contents: prompt,
-            config: {
-              systemInstruction,
-              temperature: 0.9,
-              responseMimeType: 'application/json',
-            },
-          });
-          responseText = res.text?.trim() || '';
+          try {
+            const res = await ai.models.generateContent({
+              model: 'gemini-2.5-flash',
+              contents: prompt,
+              config: {
+                systemInstruction,
+                temperature: 0.9,
+                responseMimeType: 'application/json',
+              },
+            });
+            responseText = res.text?.trim() || '';
+          } catch (flashErr) {
+            console.warn('Gemini 2.5 Flash also unavailable, proceeding to local fallback');
+          }
         }
 
         if (responseText) {

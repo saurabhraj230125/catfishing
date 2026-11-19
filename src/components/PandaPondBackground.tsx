@@ -304,14 +304,14 @@ export function PandaPondBackground({ pondState }: PandaPondBackgroundProps) {
                     animate={{ opacity: 1, y: -30, scale: 1.2 }}
                     exit={{ opacity: 0 }}
                     transition={{ duration: 0.35 }}
-                    className="absolute -top-8 left-1/2 -translate-x-1/2 font-mono font-black text-xl text-amber-500 drop-shadow-md"
+                    className="absolute -top-8 left-1/2 -translate-x-1/2 font-mono font-black text-xl text-amber-500 drop-shadow-md pointer-events-none select-none"
                   >
                     BITE! 🐟
                   </motion.div>
                   <motion.div
                     animate={{ scale: [0.5, 2], opacity: [1, 0] }}
                     transition={{ duration: 0.6, repeat: Infinity }}
-                    className="absolute -inset-6 rounded-full border-2 border-cyan-200"
+                    className="absolute -inset-6 rounded-full border-2 border-cyan-200 pointer-events-none"
                   />
                 </>
               )}
