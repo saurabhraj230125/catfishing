@@ -1,6 +1,7 @@
 import type { Metadata, Viewport } from "next";
 import "./globals.css";
 import { GoogleAnalytics } from "@/components/GoogleAnalytics";
+import { ToastContainer } from "@/components/Toast";
 
 export const metadata: Metadata = {
   title: "CATCH ME IF YOU CAN // Gamified Social Deduction Chat",
@@ -20,6 +21,7 @@ export const viewport: Viewport = {
   width: "device-width",
   initialScale: 1,
   maximumScale: 5,
+  viewportFit: "cover",
   themeColor: "#E0F7FA",
 };
 
@@ -68,6 +70,7 @@ export default function RootLayout({
       </head>
       <body className="bg-[#E0F7FA] text-slate-900 min-h-screen antialiased selection:bg-teal-300 selection:text-slate-900">
         <GoogleAnalytics />
+        <ToastContainer />
         {children}
       </body>
     </html>

@@ -188,26 +188,29 @@ export function ProfileEditor({
   };
 
   return (
-    <div className="relative z-10 w-full max-w-xl mx-auto px-3 sm:px-4 py-3 sm:py-5">
+    <div className="relative z-10 w-full max-w-xl mx-auto px-3 sm:px-4 py-2 sm:py-5">
       <motion.div
         initial={{ opacity: 0, y: 16 }}
         animate={{ opacity: 1, y: 0 }}
         transition={{ duration: 0.35, ease: 'easeOut' }}
         className="bg-white/95 backdrop-blur-xl rounded-3xl border-2 border-slate-900/10 shadow-[0_20px_50px_rgba(0,131,143,0.16)] p-4 sm:p-6"
       >
-        {/* Navigation & Header */}
+        {/* Navigation & Step Pill */}
         <div className="flex items-center justify-between mb-3">
           <button
             onClick={onBack}
             type="button"
-            className="inline-flex items-center gap-1.5 text-xs font-bold text-slate-500 hover:text-slate-800 transition-colors p-1"
+            className="inline-flex items-center gap-1.5 text-xs font-bold text-slate-500 hover:text-slate-800 transition-colors min-h-[44px] min-w-[44px] px-2.5 py-1.5 rounded-xl hover:bg-slate-100 touch-manipulation cursor-pointer"
           >
             <ArrowLeft className="w-4 h-4" />
             <span>Back</span>
           </button>
           
-          <div className="flex items-center gap-2">
-            <span className={`inline-flex items-center gap-1 text-[11px] font-black uppercase px-3 py-1 rounded-full ${
+          <div className="flex items-center gap-1.5">
+            <span className="text-[10px] sm:text-[11px] font-black uppercase tracking-wider text-teal-800 bg-teal-50 px-3 py-1 rounded-full border border-teal-200">
+              Step 2 of 2: Profile
+            </span>
+            <span className={`inline-flex items-center gap-1 text-[10px] sm:text-[11px] font-black uppercase px-2.5 py-1 rounded-full ${
               isCatfisher 
                 ? 'bg-rose-100 text-rose-700 border border-rose-300' 
                 : 'bg-sky-100 text-sky-700 border border-sky-300'
@@ -215,12 +218,12 @@ export function ProfileEditor({
               {isCatfisher ? (
                 <>
                   <VenetianMask className="w-3.5 h-3.5" />
-                  Catfish Disguise
+                  <span>Catfish Disguise</span>
                 </>
               ) : (
                 <>
                   <UserCheck className="w-3.5 h-3.5" />
-                  Real Persona
+                  <span>Real Persona</span>
                 </>
               )}
             </span>
@@ -243,17 +246,15 @@ export function ProfileEditor({
           <button
             type="button"
             onClick={handleRollRandomPersona}
-            className="inline-flex items-center justify-center gap-1.5 px-3 py-1.5 rounded-xl bg-amber-50 hover:bg-amber-100 border border-amber-200 text-amber-900 text-xs font-black transition-all shadow-2xs self-start sm:self-auto"
+            className="min-h-[40px] inline-flex items-center justify-center gap-1.5 px-3 py-1.5 rounded-xl bg-amber-50 hover:bg-amber-100 border border-amber-200 text-amber-900 text-xs font-black transition-all shadow-2xs self-start sm:self-auto cursor-pointer"
             title="Roll random Hinglish persona"
           >
-            <Dices className="w-3.5 h-3.5 text-amber-600" />
+            <Dices className="w-4 h-4 text-amber-600" />
             <span>🎲 Quick Spark</span>
           </button>
         </div>
 
-        {/* ========================================================
-            LIVE INTERACTIVE "INSTAGRAM STORY" CARD PREVIEW
-            ======================================================== */}
+        {/* LIVE INTERACTIVE "INSTAGRAM STORY" CARD PREVIEW */}
         <div className="w-full bg-gradient-to-r from-slate-50 via-teal-50/30 to-sky-50/40 rounded-2xl border border-slate-200 p-3 mb-4 shadow-2xs">
           <div className="flex items-center gap-3">
             {/* Story Ring Avatar */}
@@ -293,7 +294,7 @@ export function ProfileEditor({
         </div>
 
         <form onSubmit={handleSaveAndCast} className="space-y-3.5">
-          {/* Presented Gender Switcher (Boy ↔ Girl) */}
+          {/* 1. Character Gender Switcher */}
           <div>
             <div className="flex items-center justify-between mb-1">
               <label className="text-[11px] font-black uppercase tracking-wider text-slate-800">
@@ -309,7 +310,7 @@ export function ProfileEditor({
               <button
                 type="button"
                 onClick={() => handleGenderToggle('boy')}
-                className={`flex items-center justify-center gap-2 py-2 px-3 rounded-2xl font-black text-xs sm:text-sm border-2 transition-all ${
+                className={`min-h-[44px] flex items-center justify-center gap-2 py-2 px-3 rounded-2xl font-black text-xs sm:text-sm border-2 transition-all cursor-pointer ${
                   presentedGender === 'boy'
                     ? 'border-sky-500 bg-sky-500 text-white shadow-sm'
                     : 'border-slate-200 bg-slate-50 text-slate-700 hover:bg-slate-100'
@@ -321,7 +322,7 @@ export function ProfileEditor({
               <button
                 type="button"
                 onClick={() => handleGenderToggle('girl')}
-                className={`flex items-center justify-center gap-2 py-2 px-3 rounded-2xl font-black text-xs sm:text-sm border-2 transition-all ${
+                className={`min-h-[44px] flex items-center justify-center gap-2 py-2 px-3 rounded-2xl font-black text-xs sm:text-sm border-2 transition-all cursor-pointer ${
                   presentedGender === 'girl'
                     ? 'border-rose-500 bg-rose-500 text-white shadow-sm'
                     : 'border-slate-200 bg-slate-50 text-slate-700 hover:bg-slate-100'
@@ -333,7 +334,7 @@ export function ProfileEditor({
             </div>
           </div>
 
-          {/* 8 Character Avatars Gallery (Dynamic for selected gender) */}
+          {/* 2. Choose Avatar Gallery */}
           <div>
             <div className="flex items-center justify-between mb-1.5">
               <label className="text-[11px] font-black uppercase tracking-wider text-slate-800">
@@ -355,7 +356,7 @@ export function ProfileEditor({
                       setShowCustomAvatarInput(false);
                       setAvatar(p.url);
                     }}
-                    className={`relative aspect-square rounded-2xl overflow-hidden border-2 transition-all p-0.5 ${
+                    className={`relative min-h-[44px] aspect-square rounded-2xl overflow-hidden border-2 transition-all p-0.5 cursor-pointer ${
                       isSelected
                         ? 'border-indigo-600 ring-2 ring-indigo-400 scale-105 shadow-md bg-indigo-50'
                         : 'border-slate-200 hover:border-slate-300 hover:scale-102 bg-white'
@@ -378,7 +379,7 @@ export function ProfileEditor({
               <button
                 type="button"
                 onClick={() => setShowCustomAvatarInput(!showCustomAvatarInput)}
-                className="text-[11px] font-bold text-indigo-600 hover:text-indigo-800 inline-flex items-center gap-1"
+                className="text-[11px] font-bold text-indigo-600 hover:text-indigo-800 inline-flex items-center gap-1 min-h-[36px] py-1"
               >
                 <ImageIcon className="w-3.5 h-3.5" />
                 <span>{showCustomAvatarInput ? 'Hide Custom Image URL' : 'Or paste custom image link...'}</span>
@@ -396,20 +397,20 @@ export function ProfileEditor({
                   placeholder="Paste direct avatar URL (https://...)"
                   value={customAvatarUrl}
                   onChange={(e) => setCustomAvatarUrl(e.target.value)}
-                  className="w-full px-3 py-1.5 text-xs rounded-xl border border-slate-300 focus:outline-none focus:ring-2 focus:ring-indigo-500 font-mono"
+                  className="w-full px-3 py-2 text-base sm:text-xs rounded-xl border border-slate-300 focus:outline-none focus:ring-2 focus:ring-indigo-500 font-mono"
                 />
               </motion.div>
             )}
           </div>
 
-          {/* 3. Display Name & @Username Blanks */}
+          {/* 3. Display Name & @Username Blanks (text-base 16px to prevent iOS auto-zoom) */}
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-2.5">
             <div>
               <div className="flex items-center justify-between mb-1">
                 <label className="text-[11px] font-black uppercase tracking-wider text-slate-800">
                   Display Name
                 </label>
-                <span className="text-[10px] text-slate-400">Your public name</span>
+                <span className="text-[10px] text-slate-400">Public name</span>
               </div>
               <input
                 type="text"
@@ -417,7 +418,7 @@ export function ProfileEditor({
                 value={displayName}
                 onChange={(e) => setDisplayName(e.target.value)}
                 placeholder={presentedGender === 'boy' ? 'e.g. Kabir Sharma, Dev Rajput' : 'e.g. Kyra Singh, Simran Yadav'}
-                className="w-full px-3 py-2 sm:py-2.5 rounded-xl border border-slate-300 focus:outline-none focus:ring-2 focus:ring-indigo-500 text-base sm:text-sm font-semibold text-slate-900 bg-white touch-manipulation"
+                className="w-full min-h-[44px] px-3 py-2.5 rounded-xl border border-slate-300 focus:outline-none focus:ring-2 focus:ring-indigo-500 text-base font-semibold text-slate-900 bg-white touch-manipulation"
               />
             </div>
 
@@ -434,7 +435,7 @@ export function ProfileEditor({
                 value={username}
                 onChange={(e) => setUsername(e.target.value)}
                 placeholder={presentedGender === 'boy' ? '@kabir_lifts, @dev_richkid' : '@kyra.singh_, @simran_yadav'}
-                className="w-full px-3 py-2 sm:py-2.5 rounded-xl border border-slate-300 focus:outline-none focus:ring-2 focus:ring-indigo-500 text-base sm:text-sm font-mono font-semibold text-slate-900 bg-white touch-manipulation"
+                className="w-full min-h-[44px] px-3 py-2.5 rounded-xl border border-slate-300 focus:outline-none focus:ring-2 focus:ring-indigo-500 text-base font-mono font-semibold text-slate-900 bg-white touch-manipulation"
               />
             </div>
           </div>
@@ -459,7 +460,7 @@ export function ProfileEditor({
                   ? 'e.g. Aap mujhe pehle kyu nahi mile warna aapko hi bana leti ✨'
                   : 'e.g. Yahan imaandari chalta hai babu, test your loyalty ☕'
               }
-              className="w-full px-3 py-2 sm:py-2.5 rounded-xl border border-slate-300 focus:outline-none focus:ring-2 focus:ring-indigo-500 text-base sm:text-sm text-slate-900 font-medium bg-white touch-manipulation"
+              className="w-full min-h-[44px] px-3 py-2.5 rounded-xl border border-slate-300 focus:outline-none focus:ring-2 focus:ring-indigo-500 text-base text-slate-900 font-medium bg-white touch-manipulation"
             />
           </div>
 
@@ -481,7 +482,7 @@ export function ProfileEditor({
                     key={vibe}
                     type="button"
                     onClick={() => toggleVibe(vibe)}
-                    className={`px-2.5 py-1 rounded-full text-[11px] font-bold transition-all ${
+                    className={`min-h-[36px] px-3 py-1.5 rounded-full text-xs font-bold transition-all cursor-pointer ${
                       isSelected
                         ? 'bg-indigo-600 text-white shadow-2xs'
                         : 'bg-slate-100 text-slate-700 hover:bg-slate-200'
@@ -494,13 +495,13 @@ export function ProfileEditor({
             </div>
           </div>
 
-          {/* Primary Submit Button: 🎣 CAST LINE INTO POND */}
+          {/* Primary Submit Button */}
           <div className="pt-2">
             <motion.button
               whileHover={{ scale: 1.02 }}
               whileTap={{ scale: 0.98 }}
               type="submit"
-              className="w-full py-3.5 rounded-2xl bg-gradient-to-r from-emerald-500 via-teal-600 to-cyan-600 text-white font-black text-sm sm:text-base tracking-wide shadow-lg hover:shadow-cyan-500/25 transition-all flex items-center justify-center gap-2"
+              className="w-full min-h-[50px] py-3.5 rounded-2xl bg-gradient-to-r from-emerald-500 via-teal-600 to-cyan-600 text-white font-black text-sm sm:text-base tracking-wide shadow-lg hover:shadow-cyan-500/25 transition-all flex items-center justify-center gap-2 cursor-pointer"
             >
               <span>🎣</span>
               <span>CAST LINE INTO THE POND</span>

@@ -1,6 +1,7 @@
 'use client';
 
 import React, { useState, useEffect, useRef } from 'react';
+import { doc, onSnapshot } from 'firebase/firestore';
 import { 
   UserProfile, 
   SecretIdentity, 
@@ -8,11 +9,12 @@ import {
   GameStage, 
   PondState,
   StealthPersona,
-  ChatSession
+  ChatSession,
+  PlanTier
 } from '@/types/pond';
 import { startPondMatchmaking, checkLiveWaitingOpponents, MatchSession } from '@/lib/matchmaker';
 import { getRandomBotPersona } from '@/lib/botPersonas';
-import { signOutUser, onAuthStateChanged, auth } from '@/lib/firebase';
+import { signOutUser, onAuthStateChanged, auth, db, isLiveFirebaseConfigured } from '@/lib/firebase';
 import { PandaPondBackground } from '@/components/PandaPondBackground';
 import { TopHud } from '@/components/TopHud';
 import { LandingHero } from '@/components/LandingHero';
@@ -129,6 +131,29 @@ export default function PondGamePage() {
 
     return () => unsubscribe();
   }, []);
+
+  // Real-time Firestore sync of users/{uid} for plan status & pendingPaymentUtr
+  useEffect(() => {
+    const rawUid = authAccount?.uid?.split('_')[0] || authAccount?.uid;
+    if (!rawUid || !isLiveFirebaseConfigured) return;
+
+    const unsub = onSnapshot(doc(db, 'users', rawUid), (snap) => {
+      if (snap.exists()) {
+        const data = snap.data();
+        setUserProfile((prev) => {
+          if (!prev) return prev;
+          return {
+            ...prev,
+            planTier: (data.planTier as PlanTier) || prev.planTier,
+            pendingPaymentUtr: data.pendingPaymentUtr !== undefined ? data.pendingPaymentUtr : prev.pendingPaymentUtr,
+            lastRejectedUtr: data.lastRejectedUtr !== undefined ? data.lastRejectedUtr : prev.lastRejectedUtr,
+          };
+        });
+      }
+    });
+
+    return () => unsub();
+  }, [authAccount?.uid]);
 
   // Sync profile to sessionStorage for tab isolation and persist score stats
   const persistUserProfile = (updated: UserProfile) => {
@@ -350,6 +375,10 @@ export default function PondGamePage() {
     setCurrentStage('stage_1_landing');
   };
 
+  const handlePlanUpgraded = (newTier: PlanTier) => {
+    setUserProfile((prev) => (prev ? { ...prev, planTier: newTier, pendingPaymentUtr: undefined } : prev));
+  };
+
   if (!mounted) {
     return (
       <div className="min-h-screen bg-[#E0F7FA] flex items-center justify-center">
@@ -368,6 +397,7 @@ export default function PondGamePage() {
         userProfile={userProfile}
         authAccount={authAccount}
         onSignOut={authAccount || userProfile ? handleSignOut : undefined}
+        onPlanUpgraded={handlePlanUpgraded}
       />
 
       {/* Main Game Stage Flow */}

@@ -28,7 +28,10 @@ export interface UserProfile {
   xp: number;
   streak: number;
   fishCaught: number;
+  planTier?: PlanTier;
   subscription?: UserSubscription;
+  pendingPaymentUtr?: string | null;
+  lastRejectedUtr?: string | null;
 }
 
 export interface PublicPondProfile {
@@ -102,12 +105,14 @@ export interface PendingUpiOrder {
 
 export interface PaymentRequest {
   utr: string;
-  orderCode: string;
+  orderCode?: string;
   uid: string;
   userEmail?: string;
+  payerName?: string;
   planTier: 'pro_100' | 'unlimited';
-  exactAmount: number;
-  status: 'submitted' | 'approved' | 'rejected';
+  amount: number;
+  exactAmount?: number;
+  status: 'pending' | 'submitted' | 'approved' | 'rejected';
   createdAt: number;
   reviewedAt?: number;
   adminNote?: string;

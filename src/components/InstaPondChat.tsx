@@ -20,6 +20,7 @@ import {
 import { useBotChat } from '@/hooks/useBotChat';
 import { useChatTimer } from '@/hooks/useChatTimer';
 import { PricingModal } from '@/components/PricingModal';
+import { showToast } from '@/components/Toast';
 import { 
   Send, 
   Scissors, 
@@ -31,7 +32,8 @@ import {
   XCircle,
   ShieldAlert,
   Smile,
-  Clock
+  Clock,
+  ArrowDown
 } from 'lucide-react';
 import {
   playMessageSendSound,
@@ -101,12 +103,21 @@ export function InstaPondChat({
   const [isProfileDrawerOpen, setIsProfileDrawerOpen] = useState(false);
   const [showEmojiPickerForMsg, setShowEmojiPickerForMsg] = useState<string | null>(null);
 
+  // Anti-accidental skip confirmation (2-tap Next confirmation)
+  const [isConfirmingSkip, setIsConfirmingSkip] = useState(false);
+  const skipConfirmTimeoutRef = useRef<NodeJS.Timeout | null>(null);
+
   // Live Guess Switch (Top Right): ✨ Normal vs 🎣 Catfisher
   const [userGuess, setUserGuess] = useState<SecretIdentity>('normal');
 
   // Keystroke & telemetry refs
   const backspaceCountRef = useRef(0);
   const typingTimeoutRef = useRef<NodeJS.Timeout | null>(null);
+
+  // Smart auto-scroll refs & state
+  const scrollContainerRef = useRef<HTMLDivElement | null>(null);
+  const isNearBottomRef = useRef(true);
+  const [hasUnreadBelow, setHasUnreadBelow] = useState(false);
 
   // Messages ref to allow stable history access without re-triggering effects
   const messagesRef = useRef<ChatMessage[]>(messages);
@@ -178,7 +189,6 @@ export function InstaPondChat({
 
   // 1. DECOUPLED FIRESTORE LISTENER (Guarded strictly for human sessions only)
   useEffect(() => {
-    // CRITICAL BUG FIX: Never attach Firestore listeners to bot sessions
     if (!activeSession || activeSession.type !== 'human') return;
 
     const unsubscribe = subscribeToChatRoom(roomId, currentUser.uid, {
@@ -212,9 +222,29 @@ export function InstaPondChat({
     };
   }, [roomId, currentUser.uid, activeSession]);
 
-  // Auto-scroll on new message
+  // Handle scroll tracking
+  const handleScroll = () => {
+    const el = scrollContainerRef.current;
+    if (!el) return;
+    const distanceToBottom = el.scrollHeight - el.scrollTop - el.clientHeight;
+    const nearBottom = distanceToBottom < 120;
+    isNearBottomRef.current = nearBottom;
+    if (nearBottom) {
+      setHasUnreadBelow(false);
+    }
+  };
+
+  const scrollToBottom = (smooth = true) => {
+    messagesEndRef.current?.scrollIntoView({ behavior: smooth ? 'smooth' : 'auto' });
+  };
+
+  // Smart auto-scroll on new message
   useEffect(() => {
-    messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
+    if (isNearBottomRef.current) {
+      scrollToBottom();
+    } else {
+      setHasUnreadBelow(true);
+    }
   }, [messages, opponentTyping.isTyping]);
 
   // 2. INSTANT OPTIMISTIC SEND + NON-BLOCKING INPUT
@@ -236,8 +266,10 @@ export function InstaPondChat({
       createdAt: new Date(),
     };
 
-    // Instant optimistic UI update: never lag or wait
+    // Instant optimistic UI update
     setMessages((prev) => [...prev, userMsg]);
+    isNearBottomRef.current = true;
+    scrollToBottom();
 
     if (activeSession.type === 'bot') {
       queueUserMessage(text, userMsgId);
@@ -276,6 +308,7 @@ export function InstaPondChat({
   const handleDoubleTapMessage = async (msg: ChatMessage) => {
     playReactionSound();
     trackEvent('chat_message_hearted');
+    showToast('❤️ Reacted to message', 'info');
 
     if (activeSession.type === 'bot') {
       setMessages((prev) =>
@@ -296,6 +329,7 @@ export function InstaPondChat({
     playReactionSound();
     setShowEmojiPickerForMsg(null);
     trackEvent('chat_reaction_selected', { emoji });
+    showToast(`${emoji} Reacted`, 'info');
 
     if (activeSession.type === 'bot') {
       setMessages((prev) =>
@@ -321,6 +355,27 @@ export function InstaPondChat({
     trackEvent('chat_savage_line_roulette');
     const randomPick = SAVAGE_HINGLISH_LINES[Math.floor(Math.random() * SAVAGE_HINGLISH_LINES.length)];
     setInputText(randomPick);
+  };
+
+  // Anti-accidental skip: 2-tap confirmation logic
+  const handleNextButtonClick = () => {
+    if (isOpponentDisconnected) {
+      handleTriggerNext();
+      return;
+    }
+
+    if (!isConfirmingSkip) {
+      setIsConfirmingSkip(true);
+      triggerHaptic('light');
+      if (skipConfirmTimeoutRef.current) clearTimeout(skipConfirmTimeoutRef.current);
+      skipConfirmTimeoutRef.current = setTimeout(() => {
+        setIsConfirmingSkip(false);
+      }, 2500);
+    } else {
+      if (skipConfirmTimeoutRef.current) clearTimeout(skipConfirmTimeoutRef.current);
+      setIsConfirmingSkip(false);
+      handleTriggerNext();
+    }
   };
 
   // Trigger Skip / Next with "KHATAM HO GAYA BHAIYA MATTER!" Reveal
@@ -367,20 +422,21 @@ export function InstaPondChat({
   };
 
   return (
-    <div className="relative z-30 pointer-events-auto w-full max-w-lg mx-auto px-2 sm:px-4 py-1 sm:py-3 h-[calc(100dvh-60px)] sm:h-[84dvh] max-h-[760px] flex flex-col">
+    <div className="relative z-30 pointer-events-auto w-full max-w-lg mx-auto px-2 sm:px-4 py-1 sm:py-2 h-[calc(100dvh-56px)] sm:h-[84dvh] max-h-[780px] flex flex-col pb-[max(0.5rem,env(safe-area-inset-bottom))]">
       <motion.div
         initial={{ opacity: 0, scale: 0.98 }}
         animate={{ opacity: 1, scale: 1 }}
         className="relative z-30 pointer-events-auto bg-white/95 backdrop-blur-xl rounded-3xl border-2 border-slate-900/10 shadow-[0_20px_50px_rgba(0,131,143,0.18)] flex flex-col flex-1 overflow-hidden"
       >
         {/* ========================================================
-            HEADER: STORY RING AVATAR, TIMER PILL & GUESS SWITCH
+            HEADER (~60px): STORY RING AVATAR, TIMER PILL & GUESS SWITCH
             ======================================================== */}
-        <div className="px-3 sm:px-4 py-2 border-b border-slate-100 bg-white/90 backdrop-blur-md flex items-center justify-between gap-1.5 z-20">
+        <div className="px-3 sm:px-4 py-2 min-h-[58px] border-b border-slate-100 bg-white/90 backdrop-blur-md flex items-center justify-between gap-1.5 z-20">
           <button
             onClick={() => setIsProfileDrawerOpen(!isProfileDrawerOpen)}
             type="button"
-            className="flex items-center gap-2 text-left group hover:opacity-90 transition-opacity min-w-0 cursor-pointer"
+            className="flex items-center gap-2 text-left group hover:opacity-90 transition-opacity min-w-0 cursor-pointer min-h-[44px]"
+            title="Tap to view bio & vibes"
           >
             <div className="p-0.5 rounded-full insta-story-ring flex-shrink-0">
               <div className="w-8 h-8 sm:w-9 sm:h-9 rounded-full bg-white p-0.5">
@@ -394,7 +450,7 @@ export function InstaPondChat({
 
             <div className="min-w-0">
               <div className="flex items-center gap-1">
-                <span className="font-black text-xs sm:text-sm text-slate-900 tracking-tight truncate max-w-[90px] sm:max-w-[130px]">
+                <span className="font-black text-xs sm:text-sm text-slate-900 tracking-tight truncate max-w-[85px] sm:max-w-[130px]">
                   {opponent.username}
                 </span>
                 <span className="relative flex h-2 w-2 flex-shrink-0">
@@ -417,12 +473,12 @@ export function InstaPondChat({
           </button>
 
           {/* Right Header Side: Live Session Timer + Live Guess Switch */}
-          <div className="flex items-center gap-1.5 flex-shrink-0">
+          <div className="flex items-center gap-1 sm:gap-1.5 flex-shrink-0">
             {/* Live 5-Minute / Quota Countdown Timer */}
             <button
               type="button"
               onClick={openPricingModal}
-              className={`inline-flex items-center gap-1 px-2 sm:px-2.5 py-1 rounded-full text-[11px] sm:text-xs font-black transition-all shadow-xs cursor-pointer border ${
+              className={`min-h-[38px] inline-flex items-center gap-1 px-2 sm:px-2.5 py-1 rounded-full text-[11px] sm:text-xs font-black transition-all shadow-xs cursor-pointer border ${
                 urgencyLevel === 'critical'
                   ? 'bg-rose-100 text-rose-700 border-rose-300 animate-pulse'
                   : urgencyLevel === 'low'
@@ -442,15 +498,15 @@ export function InstaPondChat({
               )}
             </button>
 
-            {/* Live Guess Switch: Toggle between ✨ Normal & 🎣 Catfisher */}
-            <div className="flex items-center gap-1 bg-slate-100 p-0.5 sm:p-1 rounded-full border border-slate-200 text-xs shadow-inner">
+            {/* Live Guess Switch: Toggle between ✨ Asli & 🎭 Catfish */}
+            <div className="flex items-center gap-0.5 sm:gap-1 bg-slate-100 p-0.5 sm:p-1 rounded-full border border-slate-200 text-xs shadow-inner">
               <button
                 onClick={() => {
                   setUserGuess('normal');
                   playReactionSound();
                 }}
                 type="button"
-                className={`px-2 sm:px-2.5 py-0.5 sm:py-1 rounded-full text-[10px] sm:text-[11px] font-black transition-all cursor-pointer ${
+                className={`min-h-[34px] px-2 sm:px-2.5 py-1 rounded-full text-[10px] sm:text-[11px] font-black transition-all cursor-pointer flex items-center justify-center ${
                   userGuess === 'normal'
                     ? 'bg-sky-600 text-white shadow-xs'
                     : 'text-slate-600 hover:text-slate-900'
@@ -465,7 +521,7 @@ export function InstaPondChat({
                   playReactionSound();
                 }}
                 type="button"
-                className={`px-2 sm:px-2.5 py-0.5 sm:py-1 rounded-full text-[10px] sm:text-[11px] font-black transition-all cursor-pointer ${
+                className={`min-h-[34px] px-2 sm:px-2.5 py-1 rounded-full text-[10px] sm:text-[11px] font-black transition-all cursor-pointer flex items-center justify-center ${
                   userGuess === 'catfisher'
                     ? 'bg-rose-600 text-white shadow-xs'
                     : 'text-slate-600 hover:text-slate-900'
@@ -479,11 +535,11 @@ export function InstaPondChat({
         </div>
 
         {/* Safety Warning Banner */}
-        <div className="bg-amber-50/95 border-b border-amber-200 px-3 py-1.5 flex items-center justify-between text-[10px] sm:text-[11px] text-amber-900 font-semibold z-10 shadow-2xs">
+        <div className="bg-amber-50/95 border-b border-amber-200 px-3 py-1 flex items-center justify-between text-[10px] text-amber-900 font-semibold z-10 shadow-2xs">
           <div className="flex items-center gap-1.5 min-w-0">
             <ShieldAlert className="w-3.5 h-3.5 text-amber-600 flex-shrink-0" />
             <span className="truncate">
-              ⚠️ <strong>Safe Chat Alert:</strong> Do not share personal information (Phone, UPI, Address, Socials). Chat at your own risk!
+              ⚠️ <strong>Safe Chat Alert:</strong> Do not share personal info (Phone, UPI, Address). Chat at your own risk!
             </span>
           </div>
         </div>
@@ -524,7 +580,7 @@ export function InstaPondChat({
             <button
               onClick={handleTriggerNext}
               type="button"
-              className="font-extrabold underline text-rose-800 hover:text-rose-950 ml-2 cursor-pointer"
+              className="font-extrabold underline text-rose-800 hover:text-rose-950 ml-2 cursor-pointer min-h-[36px] flex items-center"
             >
               Next →
             </button>
@@ -532,9 +588,13 @@ export function InstaPondChat({
         )}
 
         {/* ========================================================
-            MESSAGE STREAM
+            MESSAGE STREAM WITH SMART AUTO-SCROLL
             ======================================================== */}
-        <div className="flex-1 p-3 sm:p-4 overflow-y-auto space-y-2.5">
+        <div 
+          ref={scrollContainerRef}
+          onScroll={handleScroll}
+          className="relative flex-1 p-3 sm:p-4 overflow-y-auto space-y-2.5"
+        >
           <div className="text-center py-1">
             <span className="text-[10px] font-bold text-slate-400 bg-slate-100/90 px-3 py-0.5 rounded-full uppercase tracking-wider">
               Connected in the Pond • Double-tap to React
@@ -657,6 +717,31 @@ export function InstaPondChat({
           <div ref={messagesEndRef} />
         </div>
 
+        {/* Floating "↓ New message" Pill when user scrolled up */}
+        <AnimatePresence>
+          {hasUnreadBelow && (
+            <motion.div
+              initial={{ opacity: 0, y: 10 }}
+              animate={{ opacity: 1, y: 0 }}
+              exit={{ opacity: 0, y: 10 }}
+              className="absolute bottom-24 left-1/2 -translate-x-1/2 z-20"
+            >
+              <button
+                type="button"
+                onClick={() => {
+                  scrollToBottom();
+                  setHasUnreadBelow(false);
+                  isNearBottomRef.current = true;
+                }}
+                className="px-3.5 py-1.5 rounded-full bg-slate-900/90 text-white text-xs font-black shadow-xl flex items-center gap-1.5 backdrop-blur cursor-pointer hover:bg-black transition-all animate-bounce"
+              >
+                <ArrowDown className="w-3.5 h-3.5" />
+                <span>↓ New message</span>
+              </button>
+            </motion.div>
+          )}
+        </AnimatePresence>
+
         {/* Psychological Rewrite Alert above input bar if backspaces > 6 */}
         {opponentTyping.backspaces > 6 && (
           <div className="px-3 py-1 bg-amber-50 border-t border-amber-200 text-[10px] font-black text-amber-800 flex items-center justify-between">
@@ -677,7 +762,7 @@ export function InstaPondChat({
               type="button"
               disabled={isExpired || isOpponentDisconnected}
               onClick={() => handleAppendEmoji(emoji)}
-              className="text-sm px-1 py-0.5 hover:scale-125 transition-transform flex-shrink-0 cursor-pointer disabled:opacity-40"
+              className="text-sm px-1 py-0.5 hover:scale-125 transition-transform flex-shrink-0 cursor-pointer disabled:opacity-40 min-h-[32px] flex items-center justify-center"
               title={`Add ${emoji}`}
             >
               {emoji}
@@ -692,7 +777,7 @@ export function InstaPondChat({
             <button
               type="button"
               onClick={openPricingModal}
-              className="ml-2 px-3 py-1 rounded-full bg-rose-600 hover:bg-rose-700 text-white text-[11px] font-black shadow-xs whitespace-nowrap cursor-pointer transition-all"
+              className="ml-2 px-3 py-1 rounded-full bg-rose-600 hover:bg-rose-700 text-white text-[11px] font-black shadow-xs whitespace-nowrap cursor-pointer transition-all min-h-[36px]"
             >
               Refill Minutes →
             </button>
@@ -700,21 +785,25 @@ export function InstaPondChat({
         )}
 
         {/* ========================================================
-            BOTTOM BAR: NEXT BUTTON + PILL INPUT + SAVAGE DICE
+            BOTTOM BAR: 2-TAP NEXT BUTTON + PILL INPUT + SAVAGE DICE
             NEVER DISABLES INPUT WHILE BOT IS TYPING
             ======================================================== */}
         <div className="p-2 sm:p-3 border-t border-slate-100 bg-white flex items-center gap-2">
-          {/* Coral NEXT (Cut Line) Button */}
+          {/* Anti-Accidental Skip Button (2-tap confirmation) */}
           <motion.button
-            whileHover={{ scale: 1.04 }}
+            whileHover={{ scale: 1.03 }}
             whileTap={{ scale: 0.96 }}
-            onClick={handleTriggerNext}
-            title="Cut line & skip to next match"
+            onClick={handleNextButtonClick}
+            title={isConfirmingSkip ? 'Click again to confirm cut line' : 'Cut line & skip to next match'}
             type="button"
-            className="flex items-center gap-1 px-3 py-2 sm:py-2.5 rounded-2xl bg-rose-500 hover:bg-rose-600 text-white font-black text-xs shadow-md shadow-rose-500/20 transition-all flex-shrink-0 cursor-pointer"
+            className={`min-h-[44px] min-w-[70px] flex items-center justify-center gap-1 px-3 py-2 sm:py-2.5 rounded-2xl font-black text-xs shadow-md transition-all flex-shrink-0 cursor-pointer ${
+              isConfirmingSkip
+                ? 'bg-rose-600 hover:bg-rose-700 text-white ring-4 ring-rose-300 animate-pulse'
+                : 'bg-rose-500 hover:bg-rose-600 text-white shadow-rose-500/20'
+            }`}
           >
             <Scissors className="w-3.5 h-3.5 stroke-[2.5]" />
-            <span>NEXT</span>
+            <span>{isConfirmingSkip ? 'Sure? ✂️' : 'NEXT'}</span>
           </motion.button>
 
           {/* Rounded Instagram Pill Input */}
@@ -724,7 +813,7 @@ export function InstaPondChat({
               disabled={isExpired || isOpponentDisconnected}
               title="🎲 Savage Icebreaker Roulette"
               type="button"
-              className={`absolute left-2 p-1 rounded-full text-slate-600 transition-colors z-10 ${
+              className={`min-h-[44px] min-w-[44px] absolute left-1 flex items-center justify-center rounded-full text-slate-600 transition-colors z-10 ${
                 isExpired || isOpponentDisconnected ? 'opacity-40 cursor-not-allowed' : 'hover:bg-slate-200 cursor-pointer'
               }`}
             >
@@ -744,7 +833,7 @@ export function InstaPondChat({
                   ? 'Opponent has cut the line. Tap NEXT to rematch.'
                   : `Message ${opponent.username}...`
               }
-              className={`w-full pl-8 pr-10 py-2 sm:py-2.5 rounded-full text-base sm:text-sm text-slate-900 border transition-all font-medium touch-manipulation ${
+              className={`w-full min-h-[44px] pl-11 pr-11 py-2 sm:py-2.5 rounded-full text-base sm:text-sm text-slate-900 border transition-all font-medium touch-manipulation ${
                 isExpired || isOpponentDisconnected
                   ? 'bg-slate-100 border-slate-300 text-slate-400 cursor-not-allowed'
                   : 'bg-slate-100 hover:bg-slate-200/60 focus:bg-white border-slate-200 focus:outline-none focus:ring-2 focus:ring-purple-500'
@@ -758,9 +847,9 @@ export function InstaPondChat({
                 whileTap={{ scale: 0.9 }}
                 onClick={handleSend}
                 type="button"
-                className="absolute right-1.5 p-1.5 rounded-full bg-gradient-to-r from-purple-600 to-pink-600 text-white shadow-xs cursor-pointer"
+                className="min-h-[38px] min-w-[38px] absolute right-1.5 p-2 rounded-full bg-gradient-to-r from-purple-600 to-pink-600 text-white shadow-xs cursor-pointer flex items-center justify-center"
               >
-                <Send className="w-3.5 h-3.5 stroke-[2.5]" />
+                <Send className="w-4 h-4 stroke-[2.5]" />
               </motion.button>
             )}
           </div>

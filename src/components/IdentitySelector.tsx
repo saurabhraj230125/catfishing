@@ -28,7 +28,7 @@ export function IdentitySelector({ onIdentitySelected, onBack }: IdentitySelecto
           <button
             onClick={onBack}
             type="button"
-            className="inline-flex items-center gap-1.5 text-xs font-bold text-slate-500 hover:text-slate-800 transition-colors p-1.5 touch-manipulation"
+            className="inline-flex items-center gap-1.5 text-xs font-bold text-slate-500 hover:text-slate-800 transition-colors min-h-[44px] min-w-[44px] px-2.5 py-1.5 rounded-xl hover:bg-slate-100 touch-manipulation cursor-pointer"
           >
             <ArrowLeft className="w-4 h-4" />
             <span>Back</span>
