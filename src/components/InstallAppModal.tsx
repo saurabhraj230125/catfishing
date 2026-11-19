@@ -52,12 +52,20 @@ export function InstallAppModal({ isOpen, onClose }: InstallAppModalProps) {
         trackEvent('app_installed');
       };
 
+      const handleKeyDown = (e: KeyboardEvent) => {
+        if (e.key === 'Escape') {
+          onClose();
+        }
+      };
+
       window.addEventListener('beforeinstallprompt', handleBeforeInstall);
       window.addEventListener('appinstalled', handleAppInstalled);
+      window.addEventListener('keydown', handleKeyDown);
 
       return () => {
         window.removeEventListener('beforeinstallprompt', handleBeforeInstall);
         window.removeEventListener('appinstalled', handleAppInstalled);
+        window.removeEventListener('keydown', handleKeyDown);
       };
     }
   }, []);

@@ -5,8 +5,16 @@ import { db, isLiveFirebaseConfigured } from '@/lib/firebase';
 import { PaymentRequest } from '@/types/pond';
 
 export const dynamic = 'force-dynamic';
+export const runtime = 'nodejs';
 
-function renderHtmlResponse(title: string, message: string, isSuccess: boolean, utr: string, planTier?: string) {
+function renderHtmlResponse(
+  title: string, 
+  message: string, 
+  isSuccess: boolean, 
+  utr: string, 
+  planTier?: string,
+  userEmail?: string
+) {
   return `
     <!DOCTYPE html>
     <html lang="en">
@@ -15,16 +23,16 @@ function renderHtmlResponse(title: string, message: string, isSuccess: boolean, 
         <meta name="viewport" content="width=device-width, initial-scale=1.0" />
         <title>${title} | Catfisher Admin</title>
         <style>
+          * { box-sizing: border-box; }
           body {
             font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
             background: #E0F7FA;
             margin: 0;
-            padding: 24px;
+            padding: 16px;
             display: flex;
             align-items: center;
             justify-content: center;
             min-height: 100vh;
-            box-sizing: border-box;
           }
           .card {
             background: #FFFFFF;
@@ -64,22 +72,43 @@ function renderHtmlResponse(title: string, message: string, isSuccess: boolean, 
             background: #F8FAFC;
             border: 1px solid #E2E8F0;
             border-radius: 16px;
-            padding: 14px;
+            padding: 16px;
             font-size: 13px;
-            font-family: monospace;
-            font-weight: 700;
-            color: #0F172A;
+            text-align: left;
             margin-bottom: 24px;
+            line-height: 1.6;
+          }
+          .row {
+            display: flex;
+            justify-content: space-between;
+            margin-bottom: 6px;
+          }
+          .row:last-child {
+            margin-bottom: 0;
+          }
+          .label {
+            color: #64748B;
+            font-weight: 600;
+          }
+          .val {
+            font-family: monospace;
+            font-weight: 800;
+            color: #0F172A;
           }
           .btn {
-            display: inline-block;
+            display: block;
+            width: 100%;
             background: #0F172A;
             color: #FFFFFF;
             text-decoration: none;
-            padding: 12px 24px;
+            padding: 14px 24px;
             border-radius: 14px;
             font-weight: 800;
             font-size: 13px;
+            letter-spacing: 0.2px;
+          }
+          .btn:hover {
+            background: #000000;
           }
         </style>
       </head>
@@ -89,10 +118,26 @@ function renderHtmlResponse(title: string, message: string, isSuccess: boolean, 
           <h1>${title}</h1>
           <p>${message}</p>
           <div class="details">
-            <div>UTR: ${utr}</div>
-            ${planTier ? `<div style="margin-top: 4px; color: #0284C7;">Plan: ${planTier === 'pro_100' ? '₹99 (100 Mins)' : '₹249 (Unlimited)'}</div>` : ''}
+            <div class="row">
+              <span class="label">12-Digit UTR:</span>
+              <span class="val">${utr}</span>
+            </div>
+            ${userEmail ? `
+            <div class="row">
+              <span class="label">User Email:</span>
+              <span class="val" style="font-family: sans-serif; font-size: 12px;">${userEmail}</span>
+            </div>` : ''}
+            ${planTier ? `
+            <div class="row">
+              <span class="label">Plan Tier:</span>
+              <span class="val" style="color: #059669;">${planTier === 'pro_100' ? '100 Mins (₹99)' : 'Unlimited (₹249)'}</span>
+            </div>` : ''}
+            <div class="row">
+              <span class="label">Processed At:</span>
+              <span class="val" style="font-size: 11px;">${new Date().toLocaleTimeString('en-IN', { timeZone: 'Asia/Kolkata' })} IST</span>
+            </div>
           </div>
-          <a href="/admin/payments" class="btn">Open Admin Dashboard →</a>
+          <a href="/admin/payments" class="btn">Open Admin Payments Console →</a>
         </div>
       </body>
     </html>
@@ -113,7 +158,7 @@ export async function GET(req: NextRequest) {
   }
 
   // 1. Verify cryptographic HMAC signature
-  const secret = process.env.ADMIN_ACTION_SECRET || 'catfisher_secret_admin_token_key_2026';
+  const secret = process.env.ADMIN_ACTION_SECRET || 'catfisher_pond_hmac_secret_98421_live';
   const expectedToken = crypto.createHmac('sha256', secret).update(`${utr}:${action}`).digest('hex');
 
   const tokenBuffer = Buffer.from(token, 'hex');
@@ -149,14 +194,14 @@ export async function GET(req: NextRequest) {
     // Check if already finalized
     if (data.status === 'approved') {
       return new NextResponse(
-        renderHtmlResponse('Already Approved', `This payment request was already approved and credited previously.`, true, utr, data.planTier),
+        renderHtmlResponse('Already Approved', `This payment request was already approved and credited previously.`, true, utr, data.planTier, data.userEmail),
         { status: 200, headers: { 'Content-Type': 'text/html' } }
       );
     }
 
     if (data.status === 'rejected') {
       return new NextResponse(
-        renderHtmlResponse('Already Rejected', `This payment request was already rejected previously.`, false, utr, data.planTier),
+        renderHtmlResponse('Already Rejected', `This payment request was already rejected previously.`, false, utr, data.planTier, data.userEmail),
         { status: 200, headers: { 'Content-Type': 'text/html' } }
       );
     }
@@ -181,6 +226,7 @@ export async function GET(req: NextRequest) {
         monthlyAllowanceSeconds: secondsUnlocked,
         planRenewsAt: renewsAt,
         pendingPaymentUtr: null,
+        lastApprovedUtr: utr,
         updatedAt: now,
       });
 
@@ -190,7 +236,8 @@ export async function GET(req: NextRequest) {
           `Plan ${data.planTier === 'pro_100' ? '100 Minutes (₹99)' : 'Unlimited (₹249)'} has been unlocked immediately for user ${data.userEmail || data.uid}.`,
           true,
           utr,
-          data.planTier
+          data.planTier,
+          data.userEmail
         ),
         { status: 200, headers: { 'Content-Type': 'text/html' } }
       );
@@ -214,7 +261,8 @@ export async function GET(req: NextRequest) {
           `UTR #${utr} has been marked rejected. The user has been notified to re-verify their reference number.`,
           false,
           utr,
-          data.planTier
+          data.planTier,
+          data.userEmail
         ),
         { status: 200, headers: { 'Content-Type': 'text/html' } }
       );
@@ -227,4 +275,3 @@ export async function GET(req: NextRequest) {
     );
   }
 }
-

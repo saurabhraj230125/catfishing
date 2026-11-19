@@ -82,6 +82,18 @@ export function PricingModal({
     }
   }, [isOpen]);
 
+  // Close on Escape key
+  useEffect(() => {
+    if (!isOpen) return;
+    const handleKeyDown = (e: KeyboardEvent) => {
+      if (e.key === 'Escape') {
+        onClose();
+      }
+    };
+    window.addEventListener('keydown', handleKeyDown);
+    return () => window.removeEventListener('keydown', handleKeyDown);
+  }, [isOpen, onClose]);
+
   // Real-time listener for the submitted UTR and user document (auto-unlock when approved)
   useEffect(() => {
     if (!isOpen || !submittedUtr || !isLiveFirebaseConfigured) return;
@@ -200,7 +212,7 @@ export function PricingModal({
             animate={{ opacity: 1, scale: 1, y: 0 }}
             exit={{ opacity: 0, scale: 0.94, y: 16 }}
             transition={{ duration: 0.25, ease: 'easeOut' }}
-            className="relative w-full max-w-4xl bg-white/95 backdrop-blur-md rounded-3xl sm:rounded-[36px] border-2 border-slate-900 shadow-[0_25px_70px_rgba(0,131,143,0.22)] p-5 sm:p-8 text-slate-900 my-auto"
+            className="relative w-full max-w-4xl bg-white/95 backdrop-blur-md rounded-3xl sm:rounded-[36px] border-2 border-slate-900 shadow-[0_25px_70px_rgba(0,131,143,0.22)] p-5 sm:p-8 text-slate-900 my-auto max-h-[92dvh] overflow-y-auto pb-[max(1.5rem,env(safe-area-inset-bottom))]"
           >
             {/* Close Button */}
             <button
@@ -496,7 +508,7 @@ export function PricingModal({
                         setUtrInput(val);
                       }}
                       placeholder="e.g. 432109876543"
-                      className="w-full px-3.5 py-2.5 rounded-xl border border-slate-300 bg-white text-base sm:text-sm font-mono font-bold focus:outline-none focus:ring-2 focus:ring-teal-500"
+                      className="w-full px-3.5 py-2.5 rounded-xl border border-slate-300 bg-white text-base font-mono font-bold focus:outline-none focus:ring-2 focus:ring-teal-500"
                       required
                     />
                   </div>
@@ -511,7 +523,7 @@ export function PricingModal({
                       value={payerNameInput}
                       onChange={(e) => setPayerNameInput(e.target.value)}
                       placeholder="e.g. Rohan Sharma"
-                      className="w-full px-3.5 py-2.5 rounded-xl border border-slate-300 bg-white text-base sm:text-sm font-medium focus:outline-none focus:ring-2 focus:ring-teal-500"
+                      className="w-full px-3.5 py-2.5 rounded-xl border border-slate-300 bg-white text-base font-medium focus:outline-none focus:ring-2 focus:ring-teal-500"
                     />
                   </div>
 

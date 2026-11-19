@@ -422,7 +422,7 @@ export function InstaPondChat({
   };
 
   return (
-    <div className="relative z-30 pointer-events-auto w-full max-w-lg mx-auto px-2 sm:px-4 py-1 sm:py-2 h-[calc(100dvh-56px)] sm:h-[84dvh] max-h-[780px] flex flex-col pb-[max(0.5rem,env(safe-area-inset-bottom))]">
+    <div className="relative z-30 pointer-events-auto w-full max-w-lg mx-auto px-2 sm:px-4 py-1 sm:py-2 h-[calc(100dvh-56px)] sm:h-[84dvh] max-h-[780px] flex flex-col pb-[max(0.75rem,env(safe-area-inset-bottom))]">
       <motion.div
         initial={{ opacity: 0, scale: 0.98 }}
         animate={{ opacity: 1, scale: 1 }}
@@ -833,7 +833,7 @@ export function InstaPondChat({
                   ? 'Opponent has cut the line. Tap NEXT to rematch.'
                   : `Message ${opponent.username}...`
               }
-              className={`w-full min-h-[44px] pl-11 pr-11 py-2 sm:py-2.5 rounded-full text-base sm:text-sm text-slate-900 border transition-all font-medium touch-manipulation ${
+              className={`w-full min-h-[44px] pl-11 pr-11 py-2 sm:py-2.5 rounded-full text-base text-slate-900 border transition-all font-medium touch-manipulation ${
                 isExpired || isOpponentDisconnected
                   ? 'bg-slate-100 border-slate-300 text-slate-400 cursor-not-allowed'
                   : 'bg-slate-100 hover:bg-slate-200/60 focus:bg-white border-slate-200 focus:outline-none focus:ring-2 focus:ring-purple-500'
