@@ -35,13 +35,36 @@ export function MatchmakingRadar({
     currentUser.presentedGender === 'boy' ? 'girl' : 'boy';
 
   const [tipIndex, setTipIndex] = useState(0);
+  const [secondsElapsed, setSecondsElapsed] = useState(0);
 
   useEffect(() => {
-    const interval = setInterval(() => {
+    const tipInterval = setInterval(() => {
       setTipIndex((prev) => (prev + 1) % HINGLISH_LOADING_TIPS.length);
     }, 3000);
-    return () => clearInterval(interval);
+    return () => clearInterval(tipInterval);
   }, []);
+
+  useEffect(() => {
+    const timerInterval = setInterval(() => {
+      setSecondsElapsed((prev) => prev + 1);
+    }, 1000);
+    return () => clearInterval(timerInterval);
+  }, []);
+
+  const formattedSeconds = `00:${secondsElapsed < 10 ? '0' + secondsElapsed : secondsElapsed}s`;
+
+  // Dynamic psychological retention copy
+  const targetLabel = currentUser.presentedGender === 'boy' ? 'Girl' : 'Boy';
+  let dynamicStatus = statusText;
+  if (!isBite) {
+    if (secondsElapsed <= 3) {
+      dynamicStatus = `Scanning the pond for a live ${targetLabel}...`;
+    } else if (secondsElapsed <= 7) {
+      dynamicStatus = 'Spotted someone near the dock... reeling them in 🎣';
+    } else {
+      dynamicStatus = 'Line is pulling! Establishing private DM...';
+    }
+  }
 
   return (
     <div className="relative z-10 w-full max-w-md mx-auto px-4 py-5 text-center">
@@ -55,6 +78,17 @@ export function MatchmakingRadar({
         transition={{ duration: isBite ? 0.3 : 0.4 }}
         className="bg-white/95 backdrop-blur-xl rounded-3xl border-2 border-slate-900/10 shadow-[0_20px_50px_rgba(0,131,143,0.18)] p-6 sm:p-8"
       >
+        {/* Live Connecting Seconds Timer Badge */}
+        <div className="mb-3 inline-flex items-center gap-2 px-3.5 py-1.5 rounded-full bg-slate-900 text-white shadow-md border border-slate-800">
+          <span className="relative flex h-2 w-2">
+            <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-teal-400 opacity-75"></span>
+            <span className="relative inline-flex rounded-full h-2 w-2 bg-teal-400"></span>
+          </span>
+          <span className="font-mono text-xs font-black tracking-wide">
+            ⏱ Casting Line... {formattedSeconds}
+          </span>
+        </div>
+
         {/* Animated Ripple Water Rings in Center of Card */}
         <div className="relative w-36 h-36 mx-auto mb-3 flex items-center justify-center">
           <motion.div
@@ -111,7 +145,7 @@ export function MatchmakingRadar({
         </div>
 
         <p className="mt-2 text-xs sm:text-sm text-slate-600 max-w-xs mx-auto font-semibold leading-relaxed">
-          {statusText}
+          {dynamicStatus}
         </p>
 
         {/* Testing Fallback Toggle: Match with Anyone (Ignore Gender Filter) */}

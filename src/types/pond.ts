@@ -2,6 +2,19 @@ export type SecretIdentity = 'normal' | 'catfisher';
 export type PresentedGender = 'boy' | 'girl';
 export type PondState = 'idle' | 'casting' | 'bite' | 'chatting';
 
+export type PlanTier = 'free' | 'pro_100' | 'unlimited';
+
+export interface UserSubscription {
+  uid: string;
+  email?: string;
+  planTier: PlanTier;
+  remainingSeconds: number; // 300 for free, 6000 for pro_100, -1 for unlimited
+  monthlyAllowanceSeconds: number;
+  planRenewsAt?: any;
+  createdAt?: any;
+  updatedAt?: any;
+}
+
 export interface UserProfile {
   uid: string;
   displayName: string;
@@ -15,6 +28,7 @@ export interface UserProfile {
   xp: number;
   streak: number;
   fishCaught: number;
+  subscription?: UserSubscription;
 }
 
 export interface PublicPondProfile {
@@ -26,6 +40,21 @@ export interface PublicPondProfile {
   vibes: string[];
   presentedGender: PresentedGender;
   secretIdentity: SecretIdentity;
+}
+
+export interface StealthPersona {
+  id: string;
+  displayName: string;
+  username: string;
+  avatar: string;
+  presentedGender: PresentedGender;
+  secretRole: SecretIdentity;
+  bio: string;
+  vibes: string[];
+  city: string;
+  personalityTraits: string;
+  openerPool: string[];
+  fallbackReplies: string[];
 }
 
 export interface QueueEntry {
@@ -52,6 +81,8 @@ export interface ChatRoomDoc {
   status: 'active' | 'ended';
   endedBy?: string;
   createdAt: any;
+  isBotRoom?: boolean;
+  botPersona?: StealthPersona;
   typingStatus?: {
     [uid: string]: boolean;
   };

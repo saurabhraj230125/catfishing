@@ -3,25 +3,40 @@
 import React, { useState, useEffect } from 'react';
 import Link from 'next/link';
 import { motion } from 'framer-motion';
-import { Flame, Fish, LogOut, Sparkles, Volume2, VolumeX, Download, BookOpen } from 'lucide-react';
-import { UserProfile } from '@/types/pond';
+import { Flame, Fish, LogOut, Sparkles, Volume2, VolumeX, Download, BookOpen, Crown, Zap, Clock } from 'lucide-react';
+import { UserProfile, UserSubscription, PlanTier } from '@/types/pond';
 import { isSoundMuted, toggleSoundMute, playReactionSound } from '@/lib/soundEffects';
 import { InstallAppModal } from '@/components/InstallAppModal';
+import { PricingModal } from '@/components/PricingModal';
+import { getUserSubscription } from '@/lib/subscription';
 
 interface TopHudProps {
   userProfile: UserProfile | null;
   authAccount?: { displayName?: string; photoURL?: string; email?: string } | null;
   onSignOut?: () => void;
   onResetIdentity?: () => void;
+  onPlanUpgraded?: (newTier: PlanTier) => void;
 }
 
-export function TopHud({ userProfile, authAccount, onSignOut }: TopHudProps) {
+export function TopHud({ userProfile, authAccount, onSignOut, onPlanUpgraded }: TopHudProps) {
   const [muted, setMuted] = useState(false);
   const [isInstallModalOpen, setIsInstallModalOpen] = useState(false);
+  const [isPricingModalOpen, setIsPricingModalOpen] = useState(false);
+  const [subscription, setSubscription] = useState<UserSubscription | null>(null);
 
   useEffect(() => {
     setMuted(isSoundMuted());
   }, []);
+
+  const activeUid = userProfile?.uid || authAccount?.displayName || null;
+
+  useEffect(() => {
+    if (activeUid) {
+      getUserSubscription(activeUid).then((sub) => {
+        setSubscription(sub);
+      }).catch(() => {});
+    }
+  }, [activeUid]);
 
   const handleToggleSound = () => {
     const nextMuted = toggleSoundMute();
@@ -29,6 +44,15 @@ export function TopHud({ userProfile, authAccount, onSignOut }: TopHudProps) {
     if (!nextMuted) {
       playReactionSound();
     }
+  };
+
+  const handlePlanChanged = (newTier: PlanTier) => {
+    if (activeUid) {
+      getUserSubscription(activeUid).then((sub) => {
+        setSubscription(sub);
+      }).catch(() => {});
+    }
+    onPlanUpgraded?.(newTier);
   };
   return (
     <header className="relative z-20 w-full px-3 sm:px-6 md:px-8 py-2 sm:py-3 flex items-center justify-between gap-2 select-none">
@@ -116,6 +140,47 @@ export function TopHud({ userProfile, authAccount, onSignOut }: TopHudProps) {
           </span>
         </button>
 
+        {/* Angler Pass / Minutes Bank Pill */}
+        <button
+          onClick={() => {
+            playReactionSound();
+            setIsPricingModalOpen(true);
+          }}
+          title="Angler Pass & Minutes Balance"
+          type="button"
+          className={`flex items-center gap-1 px-2.5 sm:px-3 py-1.5 rounded-full border transition-all text-xs font-black touch-manipulation flex-shrink-0 cursor-pointer shadow-xs ${
+            subscription?.planTier === 'unlimited'
+              ? 'bg-amber-100/90 text-amber-900 border-amber-300 hover:bg-amber-200'
+              : subscription?.planTier === 'pro_100'
+              ? 'bg-teal-50 text-teal-800 border-teal-300 hover:bg-teal-100'
+              : 'bg-white/95 text-slate-700 border-slate-200 hover:text-slate-950 hover:bg-slate-100'
+          }`}
+        >
+          {subscription?.planTier === 'unlimited' ? (
+            <>
+              <Crown className="w-3.5 h-3.5 text-amber-600 fill-amber-500" />
+              <span>👑 ∞ Pass</span>
+            </>
+          ) : subscription?.planTier === 'pro_100' ? (
+            <>
+              <Zap className="w-3.5 h-3.5 text-teal-600 fill-teal-500" />
+              <span>100m Bank</span>
+            </>
+          ) : (
+            <>
+              <Clock className="w-3.5 h-3.5 text-slate-500" />
+              <span>
+                {subscription?.remainingSeconds !== undefined
+                  ? `${Math.ceil(subscription.remainingSeconds / 60)}m left`
+                  : 'Pass'}
+              </span>
+              <span className="hidden sm:inline text-[9px] uppercase font-black text-teal-700 bg-teal-50 px-1.5 py-0.2 rounded border border-teal-200 ml-0.5">
+                Upgrade
+              </span>
+            </>
+          )}
+        </button>
+
         {/* User Stats if Logged In */}
         {userProfile ? (
           <>
@@ -196,6 +261,15 @@ export function TopHud({ userProfile, authAccount, onSignOut }: TopHudProps) {
       <InstallAppModal
         isOpen={isInstallModalOpen}
         onClose={() => setIsInstallModalOpen(false)}
+      />
+
+      {/* 3-Tier Monthly Plans Modal */}
+      <PricingModal
+        isOpen={isPricingModalOpen}
+        onClose={() => setIsPricingModalOpen(false)}
+        userUid={activeUid || 'guest'}
+        currentPlan={subscription?.planTier || 'free'}
+        onPlanUpgraded={handlePlanChanged}
       />
     </header>
   );

@@ -6,9 +6,11 @@ import {
   SecretIdentity, 
   PublicPondProfile, 
   GameStage, 
-  PondState 
+  PondState,
+  StealthPersona
 } from '@/types/pond';
 import { startPondMatchmaking, MatchSession } from '@/lib/matchmaker';
+import { getRandomBotPersona } from '@/lib/botPersonas';
 import { signOutUser, onAuthStateChanged, auth } from '@/lib/firebase';
 import { PandaPondBackground } from '@/components/PandaPondBackground';
 import { TopHud } from '@/components/TopHud';
@@ -49,9 +51,12 @@ export default function PondGamePage() {
   const [activeRoom, setActiveRoom] = useState<{
     roomId: string;
     opponent: PublicPondProfile;
+    isBotRoom?: boolean;
+    botPersona?: StealthPersona;
   } | null>(null);
 
   const matchSessionRef = useRef<MatchSession | null>(null);
+  const fallbackTimerRef = useRef<NodeJS.Timeout | null>(null);
 
   // Client hydration & saved stats restoration (Persistent sign-in across refreshes)
   useEffect(() => {
@@ -190,6 +195,47 @@ export default function PondGamePage() {
       await matchSessionRef.current.cancel();
       matchSessionRef.current = null;
     }
+    if (fallbackTimerRef.current) {
+      clearTimeout(fallbackTimerRef.current);
+      fallbackTimerRef.current = null;
+    }
+
+    // Stealth Real-Human Priority Window (8 to 11 Seconds Random)
+    const fallbackSeconds = 8 + Math.floor(Math.random() * 4);
+    fallbackTimerRef.current = setTimeout(async () => {
+      if (matchSessionRef.current) {
+        await matchSessionRef.current.cancel().catch(() => {});
+        matchSessionRef.current = null;
+      }
+
+      setIsBite(true);
+      setPondState('bite');
+      playBiteSound();
+      trackEvent('fish_bite_alert', { isStealth: true });
+
+      const persona = getRandomBotPersona(profile.presentedGender);
+      const stealthOpponent: PublicPondProfile = {
+        uid: `stealth_${persona.username}_${Date.now()}`,
+        username: persona.username,
+        displayName: persona.displayName,
+        avatar: persona.avatar,
+        presentedGender: persona.presentedGender,
+        secretIdentity: persona.secretRole,
+        bio: persona.bio,
+        vibes: persona.vibes,
+      };
+
+      setTimeout(() => {
+        setActiveRoom({
+          roomId: `stealth_${Date.now()}_${Math.random().toString(36).substring(2, 7)}`,
+          opponent: stealthOpponent,
+          isBotRoom: true,
+          botPersona: persona,
+        });
+        setPondState('chatting');
+        setCurrentStage('stage_5_insta_chat');
+      }, 900);
+    }, fallbackSeconds * 1000);
 
     try {
       const session = await startPondMatchmaking(
@@ -199,12 +245,20 @@ export default function PondGamePage() {
             setMatchStatusText(text);
           },
           onBite: () => {
+            if (fallbackTimerRef.current) {
+              clearTimeout(fallbackTimerRef.current);
+              fallbackTimerRef.current = null;
+            }
             setIsBite(true);
             setPondState('bite');
             playBiteSound();
             trackEvent('fish_bite_alert');
           },
           onMatched: (roomId, opponent) => {
+            if (fallbackTimerRef.current) {
+              clearTimeout(fallbackTimerRef.current);
+              fallbackTimerRef.current = null;
+            }
             trackEvent('match_connected', { roomId });
             setActiveRoom({ roomId, opponent });
             setPondState('chatting');
@@ -219,6 +273,10 @@ export default function PondGamePage() {
 
       matchSessionRef.current = session;
     } catch (err) {
+      if (fallbackTimerRef.current) {
+        clearTimeout(fallbackTimerRef.current);
+        fallbackTimerRef.current = null;
+      }
       console.error('Failed to start pond matchmaking:', err);
       setCurrentStage('stage_3_profile_editor');
       setPondState('idle');
@@ -236,6 +294,10 @@ export default function PondGamePage() {
 
   // Cancel Matchmaking
   const handleCancelMatchmaking = async () => {
+    if (fallbackTimerRef.current) {
+      clearTimeout(fallbackTimerRef.current);
+      fallbackTimerRef.current = null;
+    }
     if (matchSessionRef.current) {
       await matchSessionRef.current.cancel();
       matchSessionRef.current = null;
@@ -344,6 +406,8 @@ export default function PondGamePage() {
             roomId={activeRoom.roomId}
             currentUser={userProfile}
             opponent={activeRoom.opponent}
+            isBotRoom={activeRoom.isBotRoom}
+            botPersona={activeRoom.botPersona}
             onNextMatch={handleNextMatch}
             onExit={() => {
               setPondState('idle');
