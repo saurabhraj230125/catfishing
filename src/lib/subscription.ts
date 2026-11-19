@@ -9,7 +9,7 @@ import {
 } from 'firebase/firestore';
 import { PlanTier, UserSubscription } from '@/types/pond';
 
-const DEFAULT_FREE_SECONDS = 300; // 5 minutes
+const DEFAULT_FREE_SECONDS = 60; // 1 minute
 const PRO_100_SECONDS = 6000; // 100 minutes
 
 /**

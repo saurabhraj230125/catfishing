@@ -224,7 +224,7 @@ export function PricingModal({
                   {isExpiredPrompt ? (
                     <div className="inline-flex items-center gap-1.5 px-3.5 py-1 rounded-full bg-rose-50 border border-rose-200 text-rose-800 text-xs font-black uppercase tracking-wider mb-2">
                       <Clock className="w-3.5 h-3.5 text-rose-600" />
-                      <span>5 Minutes Complete</span>
+                      <span>1 Minute Complete</span>
                     </div>
                   ) : (
                     <div className="inline-flex items-center gap-1.5 px-3.5 py-1 rounded-full bg-teal-50 border border-teal-200 text-teal-900 text-xs font-black uppercase tracking-wider mb-2">
@@ -235,7 +235,7 @@ export function PricingModal({
 
                   <h2 className="text-xl sm:text-3xl font-black text-slate-900 tracking-tight">
                     {isExpiredPrompt
-                      ? `⏱ 5 MINUTES KHATAM! Don't Leave ${partnerHandle || 'them'} Hanging...`
+                      ? `⏱ 1 MINUTE KHATAM! Don't Leave ${partnerHandle || 'them'} Hanging...`
                       : '⚡ Level Up Your Angler Pass'}
                   </h2>
                   <p className="mt-1.5 text-xs sm:text-sm text-slate-600 font-medium">
@@ -264,7 +264,7 @@ export function PricingModal({
                       <ul className="mt-4 space-y-2 text-xs font-semibold text-slate-700">
                         <li className="flex items-center gap-2">
                           <Check className="w-3.5 h-3.5 text-teal-600 flex-shrink-0" />
-                          <span>5 Minutes free chat session</span>
+                          <span>1 Minute free chat session</span>
                         </li>
                         <li className="flex items-center gap-2">
                           <Check className="w-3.5 h-3.5 text-teal-600 flex-shrink-0" />

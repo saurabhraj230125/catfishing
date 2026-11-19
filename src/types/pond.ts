@@ -8,7 +8,7 @@ export interface UserSubscription {
   uid: string;
   email?: string;
   planTier: PlanTier;
-  remainingSeconds: number; // 300 for free, 6000 for pro_100, -1 for unlimited
+  remainingSeconds: number; // 60 for free (1 min), 6000 for pro_100, -1 for unlimited
   monthlyAllowanceSeconds: number;
   planRenewsAt?: any;
   createdAt?: any;

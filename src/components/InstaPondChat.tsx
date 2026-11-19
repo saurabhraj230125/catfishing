@@ -141,7 +141,7 @@ export function InstaPondChat({
   const openPricingModal = () => setIsPricingModalOpen(true);
   const closePricingModal = () => setIsPricingModalOpen(false);
 
-  // 5-Minute Live Chat Session & Quota Timer
+  // Live Chat Session & Quota Timer
   const {
     formattedTime,
     isExpired,
@@ -474,7 +474,7 @@ export function InstaPondChat({
 
           {/* Right Header Side: Live Session Timer + Live Guess Switch */}
           <div className="flex items-center gap-1 sm:gap-1.5 flex-shrink-0">
-            {/* Live 5-Minute / Quota Countdown Timer */}
+            {/* Live Chat Quota Countdown Timer */}
             <button
               type="button"
               onClick={openPricingModal}
