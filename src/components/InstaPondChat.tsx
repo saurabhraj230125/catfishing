@@ -773,13 +773,13 @@ export function InstaPondChat({
         {/* Quota Expired Alert Banner */}
         {isExpired && (
           <div className="bg-rose-50 border-t border-rose-200 px-3 py-2 flex items-center justify-between text-xs font-black text-rose-800 z-10 shadow-xs">
-            <span className="truncate">⏰ Angler Minutes Finished (00:00)! Refill to chat.</span>
+            <span className="truncate">⏰ Today&apos;s 5 Free Minutes Finished! Refills tomorrow, or upgrade to chat now.</span>
             <button
               type="button"
               onClick={openPricingModal}
               className="ml-2 px-3 py-1 rounded-full bg-rose-600 hover:bg-rose-700 text-white text-[11px] font-black shadow-xs whitespace-nowrap cursor-pointer transition-all min-h-[36px]"
             >
-              Refill Minutes →
+              Refill / Upgrade →
             </button>
           </div>
         )}
@@ -828,7 +828,7 @@ export function InstaPondChat({
               onKeyDown={handleKeyDown}
               placeholder={
                 isExpired
-                  ? '⏰ Angler quota expired! Refill to continue...'
+                  ? "⏰ Today's 5 mins finished! Refills tomorrow, or tap Refill to continue..."
                   : isOpponentDisconnected
                   ? 'Opponent has cut the line. Tap NEXT to rematch.'
                   : `Message ${opponent.username}...`

@@ -23,12 +23,12 @@ export function useChatTimer({
   onTimeExpired,
 }: UseChatTimerOptions) {
   const [subscription, setSubscription] = useState<UserSubscription | null>(null);
-  const [remainingSeconds, setRemainingSeconds] = useState<number>(60);
+  const [remainingSeconds, setRemainingSeconds] = useState<number>(300);
   const [isExpired, setIsExpired] = useState<boolean>(false);
   const [isLoaded, setIsLoaded] = useState<boolean>(false);
 
-  const secondsRef = useRef<number>(60);
-  const lastSavedSecondsRef = useRef<number>(60);
+  const secondsRef = useRef<number>(300);
+  const lastSavedSecondsRef = useRef<number>(300);
   const expiredTriggeredRef = useRef<boolean>(false);
   const onTimeExpiredRef = useRef(onTimeExpired);
 
@@ -125,9 +125,9 @@ export function useChatTimer({
   let urgencyLevel: UrgencyLevel = 'normal';
   if (isUnlimited) {
     urgencyLevel = 'unlimited';
-  } else if (remainingSeconds <= 15) {
-    urgencyLevel = 'critical';
   } else if (remainingSeconds <= 30) {
+    urgencyLevel = 'critical';
+  } else if (remainingSeconds <= 60) {
     urgencyLevel = 'low';
   }
 

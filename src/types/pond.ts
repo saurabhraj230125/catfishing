@@ -8,8 +8,10 @@ export interface UserSubscription {
   uid: string;
   email?: string;
   planTier: PlanTier;
-  remainingSeconds: number; // 60 for free (1 min), 6000 for pro_100, -1 for unlimited
+  remainingSeconds: number; // 300 for free (daily 5 min refill), 6000 for pro_100, -1 for unlimited
   monthlyAllowanceSeconds: number;
+  lastDailyResetDate?: string; // YYYY-MM-DD
+  lastDailyResetAt?: number; // epoch ms
   planRenewsAt?: any;
   createdAt?: any;
   updatedAt?: any;

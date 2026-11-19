@@ -248,7 +248,7 @@ export function PricingModal({
                   {isExpiredPrompt ? (
                     <div className="inline-flex items-center gap-1.5 px-3.5 py-1 rounded-full bg-rose-50 border border-rose-200 text-rose-800 text-xs font-black uppercase tracking-wider mb-2">
                       <Clock className="w-3.5 h-3.5 text-rose-600" />
-                      <span>1 Minute Complete</span>
+                      <span>Today&apos;s 5 Minutes Finished</span>
                     </div>
                   ) : (
                     <div className="inline-flex items-center gap-1.5 px-3.5 py-1 rounded-full bg-teal-50 border border-teal-200 text-teal-900 text-xs font-black uppercase tracking-wider mb-2">
@@ -259,13 +259,13 @@ export function PricingModal({
 
                   <h2 className="text-xl sm:text-3xl font-black text-slate-900 tracking-tight">
                     {isExpiredPrompt
-                      ? `⏱ 1 MINUTE KHATAM! Don't Leave ${partnerHandle || 'them'} Hanging...`
+                      ? `⏱ TODAY'S 5 MINUTES KHATAM! Don't Leave ${partnerHandle || 'them'} Hanging...`
                       : '⚡ Level Up Your Angler Pass'}
                   </h2>
                   <p className="mt-1.5 text-xs sm:text-sm text-slate-600 font-medium">
                     {isExpiredPrompt
-                      ? 'Upgrade your monthly pass to keep chatting, test catfishers, and unlock infinite pond minutes.'
-                      : 'Choose a monthly pass for priority queue matchmaking and instant verification.'}
+                      ? 'Your daily 5 free minutes are used up! Refills automatically tomorrow at 00:00, or upgrade now to keep chatting.'
+                      : 'Choose a pass for 100 minutes or unlimited live chat with priority matching.'}
                   </p>
                 </div>
 
@@ -274,36 +274,36 @@ export function PricingModal({
                   <div className="rounded-3xl border-2 border-slate-200 bg-slate-50/70 p-5 flex flex-col justify-between">
                     <div>
                       <div className="text-xs font-black text-slate-500 uppercase tracking-wider mb-1">
-                        Free Tier
+                        Free Tier • Daily Refill
                       </div>
                       <h3 className="text-lg font-black text-slate-900">Pond Visitor</h3>
                       <div className="mt-3 flex items-baseline gap-1">
                         <span className="text-3xl font-black text-slate-900">₹0</span>
-                        <span className="text-xs font-bold text-slate-500">/month</span>
+                        <span className="text-xs font-bold text-slate-500">/day</span>
                       </div>
                       <p className="mt-2 text-xs text-slate-600 font-medium leading-relaxed">
-                        Basic access to test your catfisher spotting radar.
+                        5 minutes free chat every single day. Refills automatically every 24 hours.
                       </p>
 
                       <ul className="mt-4 space-y-2 text-xs font-semibold text-slate-700">
                         <li className="flex items-center gap-2">
                           <Check className="w-3.5 h-3.5 text-teal-600 flex-shrink-0" />
-                          <span>1 Minute free chat session</span>
+                          <span>5 Minutes free chat every single day</span>
                         </li>
                         <li className="flex items-center gap-2">
                           <Check className="w-3.5 h-3.5 text-teal-600 flex-shrink-0" />
-                          <span>Truth reveal score & XP</span>
+                          <span>Refills automatically every 24 hours</span>
                         </li>
-                        <li className="flex items-center gap-2 text-slate-400">
-                          <X className="w-3.5 h-3.5 flex-shrink-0" />
-                          <span>No extended sessions</span>
+                        <li className="flex items-center gap-2">
+                          <Check className="w-3.5 h-3.5 text-teal-600 flex-shrink-0" />
+                          <span>Truth reveal score & XP tracking</span>
                         </li>
                       </ul>
                     </div>
 
                     <div className="mt-6 pt-4 border-t border-slate-200">
                       <div className="py-2.5 px-4 rounded-2xl bg-slate-200 text-slate-600 text-xs font-black text-center">
-                        {currentPlan === 'free' ? 'Current Active Tier' : 'Default Free Plan'}
+                        {currentPlan === 'free' ? '✓ Current Plan • Refills Daily' : 'Default Free Plan'}
                       </div>
                     </div>
                   </div>

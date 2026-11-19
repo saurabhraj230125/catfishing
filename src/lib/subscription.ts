@@ -9,17 +9,27 @@ import {
 } from 'firebase/firestore';
 import { PlanTier, UserSubscription } from '@/types/pond';
 
-const DEFAULT_FREE_SECONDS = 60; // 1 minute
+const DEFAULT_FREE_SECONDS = 300; // 5 minutes daily allowance
 const PRO_100_SECONDS = 6000; // 100 minutes
+
+export function getTodayDateString(): string {
+  const d = new Date();
+  const year = d.getFullYear();
+  const month = String(d.getMonth() + 1).padStart(2, '0');
+  const day = String(d.getDate()).padStart(2, '0');
+  return `${year}-${month}-${day}`;
+}
 
 /**
  * Fetch or initialize a user's subscription record in Firestore users/{uid}.
+ * Automatically refills daily 5 minutes for free tier if a new day has arrived.
  */
 export async function getUserSubscription(
   uid: string,
   email?: string
 ): Promise<UserSubscription> {
   const localCacheKey = `__pond_sub_${uid}`;
+  const today = getTodayDateString();
 
   // 1. Check local cache first for instant hydration
   if (typeof window !== 'undefined') {
@@ -28,6 +38,14 @@ export async function getUserSubscription(
       if (cached) {
         const parsed = JSON.parse(cached);
         if (parsed && typeof parsed.remainingSeconds === 'number') {
+          // Instant daily 5-minute refill from local cache if date changed
+          if (parsed.planTier === 'free' && parsed.lastDailyResetDate !== today) {
+            parsed.remainingSeconds = DEFAULT_FREE_SECONDS;
+            parsed.lastDailyResetDate = today;
+            parsed.lastDailyResetAt = Date.now();
+            localStorage.setItem(localCacheKey, JSON.stringify(parsed));
+          }
+
           // Asynchronously revalidate with Firestore in background
           syncWithFirestore(uid, email).catch(() => {});
           return parsed as UserSubscription;
@@ -41,6 +59,7 @@ export async function getUserSubscription(
 
 async function syncWithFirestore(uid: string, email?: string): Promise<UserSubscription> {
   const localCacheKey = `__pond_sub_${uid}`;
+  const today = getTodayDateString();
 
   try {
     const userDocRef = doc(db, 'users', uid);
@@ -48,12 +67,37 @@ async function syncWithFirestore(uid: string, email?: string): Promise<UserSubsc
 
     if (snap.exists()) {
       const data = snap.data();
+      const planTier: PlanTier = (data.planTier as PlanTier) || 'free';
+      let remainingSeconds = typeof data.remainingSeconds === 'number' ? data.remainingSeconds : DEFAULT_FREE_SECONDS;
+      let lastDailyResetDate = data.lastDailyResetDate || today;
+      let lastDailyResetAt = data.lastDailyResetAt || Date.now();
+
+      // AUTOMATIC DAILY 5-MINUTE REFILL FOR FREE TIER
+      if (planTier === 'free' && data.lastDailyResetDate !== today) {
+        remainingSeconds = DEFAULT_FREE_SECONDS;
+        lastDailyResetDate = today;
+        lastDailyResetAt = Date.now();
+
+        setDoc(
+          userDocRef,
+          {
+            remainingSeconds: DEFAULT_FREE_SECONDS,
+            lastDailyResetDate: today,
+            lastDailyResetAt: Date.now(),
+            updatedAt: serverTimestamp(),
+          },
+          { merge: true }
+        ).catch(() => {});
+      }
+
       const sub: UserSubscription = {
         uid,
         email: data.email || email || '',
-        planTier: (data.planTier as PlanTier) || 'free',
-        remainingSeconds: typeof data.remainingSeconds === 'number' ? data.remainingSeconds : DEFAULT_FREE_SECONDS,
+        planTier,
+        remainingSeconds,
         monthlyAllowanceSeconds: data.monthlyAllowanceSeconds || DEFAULT_FREE_SECONDS,
+        lastDailyResetDate,
+        lastDailyResetAt,
         planRenewsAt: data.planRenewsAt,
         createdAt: data.createdAt,
       };
@@ -71,6 +115,8 @@ async function syncWithFirestore(uid: string, email?: string): Promise<UserSubsc
       planTier: 'free',
       remainingSeconds: DEFAULT_FREE_SECONDS,
       monthlyAllowanceSeconds: DEFAULT_FREE_SECONDS,
+      lastDailyResetDate: today,
+      lastDailyResetAt: Date.now(),
       createdAt: serverTimestamp(),
       updatedAt: serverTimestamp(),
     };
@@ -87,13 +133,15 @@ async function syncWithFirestore(uid: string, email?: string): Promise<UserSubsc
     return initialSub;
   } catch (error) {
     console.warn('Subscription fetch notice (using safe fallback):', error);
-    // Safe offline fallback
+    // Safe offline fallback with daily reset check
     const fallbackSub: UserSubscription = {
       uid,
       email: email || '',
       planTier: 'free',
       remainingSeconds: DEFAULT_FREE_SECONDS,
       monthlyAllowanceSeconds: DEFAULT_FREE_SECONDS,
+      lastDailyResetDate: today,
+      lastDailyResetAt: Date.now(),
     };
     if (typeof window !== 'undefined') {
       try {
@@ -128,10 +176,14 @@ export async function saveUserRemainingSeconds(
   // Update Firestore
   try {
     const userDocRef = doc(db, 'users', uid);
-    await updateDoc(userDocRef, {
-      remainingSeconds,
-      updatedAt: serverTimestamp(),
-    });
+    await setDoc(
+      userDocRef,
+      {
+        remainingSeconds,
+        updatedAt: serverTimestamp(),
+      },
+      { merge: true }
+    );
   } catch (err) {
     console.debug('Failed to sync remaining seconds to Firestore:', err);
   }
@@ -191,4 +243,3 @@ export async function applyPlanUpgrade(
 
   return resultSub;
 }
-

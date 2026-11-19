@@ -164,7 +164,11 @@ export function TopHud({ userProfile, authAccount, onSignOut, onPlanUpgraded }: 
               playReactionSound();
               setIsPricingModalOpen(true);
             }}
-            title="Angler Pass & Minutes Balance"
+            title={
+              subscription?.planTier === 'free'
+                ? 'Daily 5-minute free pass — Refills every day! Click to upgrade'
+                : 'Angler Pass & Minutes Balance'
+            }
             type="button"
             className={`min-h-[36px] flex items-center gap-1 px-2.5 sm:px-3 py-1.5 rounded-full border transition-all text-xs font-black touch-manipulation flex-shrink-0 cursor-pointer shadow-xs ${
               subscription?.planTier === 'unlimited'
@@ -189,11 +193,11 @@ export function TopHud({ userProfile, authAccount, onSignOut, onPlanUpgraded }: 
                 <Clock className="w-3.5 h-3.5 text-slate-500" />
                 <span className="text-[11px]">
                   {subscription?.remainingSeconds !== undefined
-                    ? `${Math.ceil(subscription.remainingSeconds / 60)}m left`
-                    : 'Pass'}
+                    ? `${Math.ceil(subscription.remainingSeconds / 60)}m today`
+                    : '5m Daily'}
                 </span>
                 <span className="hidden sm:inline text-[9px] uppercase font-black text-teal-700 bg-teal-50 px-1.5 py-0.2 rounded border border-teal-200 ml-0.5">
-                  Upgrade
+                  Refill
                 </span>
               </>
             )}
