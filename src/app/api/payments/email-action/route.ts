@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 import crypto from 'crypto';
-import { doc, getDoc, updateDoc } from 'firebase/firestore';
+import { doc, getDoc, setDoc, updateDoc } from 'firebase/firestore';
 import { db, isLiveFirebaseConfigured } from '@/lib/firebase';
 import { PaymentRequest } from '@/types/pond';
 
@@ -210,25 +210,33 @@ export async function GET(req: NextRequest) {
 
     if (action === 'approve') {
       // 1. Update payment request in Firestore
-      await updateDoc(reqRef, {
-        status: 'approved',
-        reviewedAt: now,
-      });
+      await setDoc(
+        reqRef,
+        {
+          status: 'approved',
+          reviewedAt: now,
+        },
+        { merge: true }
+      );
 
-      // 2. Unlock plan on users/{uid}
+      // 2. Unlock plan on users/{uid} using setDoc with merge: true
       const userRef = doc(db, 'users', data.uid);
       const secondsUnlocked = data.planTier === 'pro_100' ? 6000 : -1;
       const renewsAt = now + 30 * 24 * 60 * 60 * 1000;
 
-      await updateDoc(userRef, {
-        planTier: data.planTier,
-        remainingSeconds: secondsUnlocked,
-        monthlyAllowanceSeconds: secondsUnlocked,
-        planRenewsAt: renewsAt,
-        pendingPaymentUtr: null,
-        lastApprovedUtr: utr,
-        updatedAt: now,
-      });
+      await setDoc(
+        userRef,
+        {
+          planTier: data.planTier,
+          remainingSeconds: secondsUnlocked,
+          monthlyAllowanceSeconds: secondsUnlocked,
+          planRenewsAt: renewsAt,
+          pendingPaymentUtr: null,
+          lastApprovedUtr: utr,
+          updatedAt: now,
+        },
+        { merge: true }
+      );
 
       return new NextResponse(
         renderHtmlResponse(
@@ -243,17 +251,25 @@ export async function GET(req: NextRequest) {
       );
     } else {
       // action === 'reject'
-      await updateDoc(reqRef, {
-        status: 'rejected',
-        reviewedAt: now,
-      });
+      await setDoc(
+        reqRef,
+        {
+          status: 'rejected',
+          reviewedAt: now,
+        },
+        { merge: true }
+      );
 
       const userRef = doc(db, 'users', data.uid);
-      await updateDoc(userRef, {
-        pendingPaymentUtr: null,
-        lastRejectedUtr: utr,
-        updatedAt: now,
-      });
+      await setDoc(
+        userRef,
+        {
+          pendingPaymentUtr: null,
+          lastRejectedUtr: utr,
+          updatedAt: now,
+        },
+        { merge: true }
+      );
 
       return new NextResponse(
         renderHtmlResponse(

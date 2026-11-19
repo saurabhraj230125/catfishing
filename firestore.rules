@@ -14,5 +14,20 @@ service cloud.firestore {
         allow read, write: if true;
       }
     }
+
+    // Direct UPI Payment Verification Requests
+    match /payment_requests/{utr} {
+      allow read, write: if true;
+    }
+
+    // User Profiles & Subscription Balances
+    match /users/{userId} {
+      allow read, write: if true;
+    }
+
+    // Generated UPI Orders
+    match /pending_upi_orders/{orderId} {
+      allow read, write: if true;
+    }
   }
 }

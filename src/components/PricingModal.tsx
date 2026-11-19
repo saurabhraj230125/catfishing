@@ -102,25 +102,37 @@ export function PricingModal({
 
     // 1. Listen to payment_requests/{submittedUtr}
     const reqRef = doc(db, 'payment_requests', submittedUtr);
-    const unsubReq = onSnapshot(reqRef, async (snap) => {
-      if (!snap.exists() || handled) return;
-      const data = snap.data();
-      if (data && data.status === 'approved') {
-        handled = true;
-        await triggerApprovalSuccess(selectedTier);
+    const unsubReq = onSnapshot(
+      reqRef,
+      async (snap) => {
+        if (!snap.exists() || handled) return;
+        const data = snap.data();
+        if (data && data.status === 'approved') {
+          handled = true;
+          await triggerApprovalSuccess(selectedTier);
+        }
+      },
+      (err) => {
+        console.warn('payment_requests onSnapshot notice (safely handled):', err?.message);
       }
-    });
+    );
 
     // 2. Also listen to users/{userUid}
     const userRef = doc(db, 'users', userUid);
-    const unsubUser = onSnapshot(userRef, async (snap) => {
-      if (!snap.exists() || handled) return;
-      const data = snap.data();
-      if (data && data.planTier === selectedTier) {
-        handled = true;
-        await triggerApprovalSuccess(selectedTier);
+    const unsubUser = onSnapshot(
+      userRef,
+      async (snap) => {
+        if (!snap.exists() || handled) return;
+        const data = snap.data();
+        if (data && data.planTier === selectedTier) {
+          handled = true;
+          await triggerApprovalSuccess(selectedTier);
+        }
+      },
+      (err) => {
+        console.warn('users onSnapshot notice (safely handled):', err?.message);
       }
-    });
+    );
 
     return () => {
       unsubReq();
@@ -539,7 +551,10 @@ export function PricingModal({
                     className="w-full min-h-[46px] py-3 rounded-2xl bg-teal-600 hover:bg-teal-700 disabled:opacity-50 text-white font-black text-xs sm:text-sm flex items-center justify-center gap-2 shadow-md transition-all active:scale-[0.98] cursor-pointer"
                   >
                     {isSubmittingUtr ? (
-                      <div className="w-5 h-5 border-2 border-white border-t-transparent rounded-full animate-spin" />
+                      <>
+                        <div className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin" />
+                        <span>Submitting UTR & notifying admin...</span>
+                      </>
                     ) : (
                       <>
                         <Send className="w-4 h-4" />

@@ -137,20 +137,26 @@ export default function PondGamePage() {
     const rawUid = authAccount?.uid?.split('_')[0] || authAccount?.uid;
     if (!rawUid || !isLiveFirebaseConfigured) return;
 
-    const unsub = onSnapshot(doc(db, 'users', rawUid), (snap) => {
-      if (snap.exists()) {
-        const data = snap.data();
-        setUserProfile((prev) => {
-          if (!prev) return prev;
-          return {
-            ...prev,
-            planTier: (data.planTier as PlanTier) || prev.planTier,
-            pendingPaymentUtr: data.pendingPaymentUtr !== undefined ? data.pendingPaymentUtr : prev.pendingPaymentUtr,
-            lastRejectedUtr: data.lastRejectedUtr !== undefined ? data.lastRejectedUtr : prev.lastRejectedUtr,
-          };
-        });
+    const unsub = onSnapshot(
+      doc(db, 'users', rawUid),
+      (snap) => {
+        if (snap.exists()) {
+          const data = snap.data();
+          setUserProfile((prev) => {
+            if (!prev) return prev;
+            return {
+              ...prev,
+              planTier: (data.planTier as PlanTier) || prev.planTier,
+              pendingPaymentUtr: data.pendingPaymentUtr !== undefined ? data.pendingPaymentUtr : prev.pendingPaymentUtr,
+              lastRejectedUtr: data.lastRejectedUtr !== undefined ? data.lastRejectedUtr : prev.lastRejectedUtr,
+            };
+          });
+        }
+      },
+      (err) => {
+        console.warn('users onSnapshot sync notice:', err?.message);
       }
-    });
+    );
 
     return () => unsub();
   }, [authAccount?.uid]);

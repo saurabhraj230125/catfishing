@@ -13,6 +13,7 @@ export async function POST(req: NextRequest) {
     const body = await req.json();
     const { uid, userEmail, payerName, planTier, utr } = body;
 
+    // 1. Validation
     const cleanUtr = typeof utr === 'string' ? utr.trim().replace(/\s+/g, '') : '';
     if (!cleanUtr || !/^\d{12}$/.test(cleanUtr)) {
       return NextResponse.json(
@@ -21,9 +22,16 @@ export async function POST(req: NextRequest) {
       );
     }
 
-    if (!uid || (planTier !== 'pro_100' && planTier !== 'unlimited')) {
+    if (!uid) {
       return NextResponse.json(
-        { ok: false, error: 'Invalid plan selected or missing user authentication.' },
+        { ok: false, error: 'Missing user identification. Please sign in to submit payment.' },
+        { status: 400 }
+      );
+    }
+
+    if (planTier !== 'pro_100' && planTier !== 'unlimited') {
+      return NextResponse.json(
+        { ok: false, error: 'Invalid plan selected. Must be 100 Minutes (₹99) or Unlimited (₹249).' },
         { status: 400 }
       );
     }
@@ -31,63 +39,80 @@ export async function POST(req: NextRequest) {
     const verifiedAmount = planTier === 'pro_100' ? 99 : 249;
     const planName = planTier === 'pro_100' ? '100 Minutes (Chai & Chill)' : 'Unlimited (Asli Catfisher Pass)';
     const now = Date.now();
+    const cleanPayerName = payerName ? String(payerName).trim() : 'Not provided';
+    const cleanEmail = userEmail ? String(userEmail).trim() : 'Not provided';
 
-    // 1. Check if UTR already submitted in Firestore (block duplicate reuse)
+    // 2. Duplicate Check & Firestore Write (Graceful fallback)
+    let firestoreSaved = false;
     if (isLiveFirebaseConfigured) {
-      const reqRef = doc(db, 'payment_requests', cleanUtr);
-      const existingSnap = await getDoc(reqRef);
-      if (existingSnap.exists()) {
-        const data = existingSnap.data();
-        if (data.status === 'approved') {
+      try {
+        const reqRef = doc(db, 'payment_requests', cleanUtr);
+        const existingSnap = await getDoc(reqRef);
+        if (existingSnap.exists()) {
+          const data = existingSnap.data();
+          if (data?.status === 'approved') {
+            return NextResponse.json(
+              { ok: false, error: 'This 12-digit UTR has already been approved and credited.' },
+              { status: 409 }
+            );
+          }
           return NextResponse.json(
-            { ok: false, error: 'This 12-digit UTR has already been approved and credited.' },
+            { ok: false, error: 'This 12-digit UTR has already been submitted and is currently being verified.' },
             { status: 409 }
           );
         }
-        return NextResponse.json(
-          { ok: false, error: 'This 12-digit UTR has already been submitted and is currently being verified.' },
-          { status: 409 }
+
+        const requestData: PaymentRequest = {
+          utr: cleanUtr,
+          uid,
+          userEmail: cleanEmail,
+          payerName: cleanPayerName,
+          planTier,
+          amount: verifiedAmount,
+          status: 'pending',
+          createdAt: now,
+        };
+
+        await setDoc(reqRef, requestData);
+
+        // Update users/{uid} with merge: true so it never crashes if user doc doesn't exist
+        const userRef = doc(db, 'users', uid);
+        await setDoc(
+          userRef,
+          {
+            pendingPaymentUtr: cleanUtr,
+            lastSubmittedPlan: planTier,
+            updatedAt: now,
+          },
+          { merge: true }
         );
+        firestoreSaved = true;
+      } catch (fsError: any) {
+        console.warn('Firestore write warning in submit-request (continuing to email delivery):', fsError?.message);
       }
-
-      // 2. Write new pending payment request
-      const requestData: PaymentRequest = {
-        utr: cleanUtr,
-        uid,
-        userEmail: userEmail || undefined,
-        payerName: payerName ? String(payerName).trim() : undefined,
-        planTier,
-        amount: verifiedAmount,
-        status: 'pending',
-        createdAt: now,
-      };
-
-      await setDoc(reqRef, requestData);
-
-      // Also set pendingPaymentUtr on the user's profile
-      const userRef = doc(db, 'users', uid);
-      await setDoc(userRef, { pendingPaymentUtr: cleanUtr, updatedAt: now }, { merge: true });
     }
 
     // 3. Generate HMAC-SHA256 signed 1-click Approve & Reject tokens
-    const secret = process.env.ADMIN_ACTION_SECRET || 'catfisher_pond_hmac_secret_98421_live';
-    const approveToken = crypto.createHmac('sha256', secret).update(`${cleanUtr}:approve`).digest('hex');
-    const rejectToken = crypto.createHmac('sha256', secret).update(`${cleanUtr}:reject`).digest('hex');
+    const actionSecret = (process.env.ADMIN_ACTION_SECRET || 'catfisher_pond_hmac_secret_98421_live').trim();
+    const approveToken = crypto.createHmac('sha256', actionSecret).update(`${cleanUtr}:approve`).digest('hex');
+    const rejectToken = crypto.createHmac('sha256', actionSecret).update(`${cleanUtr}:reject`).digest('hex');
 
-    // Production Vercel Base URL
-    const baseUrl = process.env.NEXT_PUBLIC_SITE_URL || 'https://catfisher.vercel.app';
+    // Production Site URL
+    const siteUrl = (process.env.NEXT_PUBLIC_SITE_URL || 'https://catfisher.vercel.app').replace(/\/$/, '');
+    const approveUrl = `${siteUrl}/api/payments/email-action?utr=${cleanUtr}&action=approve&token=${approveToken}`;
+    const rejectUrl = `${siteUrl}/api/payments/email-action?utr=${cleanUtr}&action=reject&token=${rejectToken}`;
+    const dashboardUrl = `${siteUrl}/admin/payments`;
 
-    const approveUrl = `${baseUrl}/api/payments/email-action?utr=${cleanUtr}&action=approve&token=${approveToken}`;
-    const rejectUrl = `${baseUrl}/api/payments/email-action?utr=${cleanUtr}&action=reject&token=${rejectToken}`;
-    const dashboardUrl = `${baseUrl}/admin/payments`;
-
-    // 4. Send Instant Admin Email via Nodemailer (Explicit Gmail SMTP)
-    const rawGmailUser = process.env.ADMIN_GMAIL_USER || '';
+    // 4. Guaranteed Gmail SMTP Email Dispatch (Nodemailer)
+    const rawGmailUser = process.env.ADMIN_GMAIL_USER || process.env.NEXT_PUBLIC_ADMIN_EMAIL || 'saurabhraj230125@gmail.com';
     const gmailUser = rawGmailUser.trim();
-    const appPass = (process.env.ADMIN_GMAIL_APP_PASSWORD || '').replace(/\s+/g, '');
-    const adminRecipient = (process.env.ADMIN_NOTIFICATION_EMAIL || gmailUser || process.env.NEXT_PUBLIC_ADMIN_EMAIL || 'saurabhraj230125@gmail.com').trim();
+    const gmailPass = (process.env.ADMIN_GMAIL_APP_PASSWORD || 'fkvmwgjvknlksdll').replace(/\s+/g, '');
+    const notifyTo = (process.env.ADMIN_NOTIFICATION_EMAIL || gmailUser || 'saurabhraj230125@gmail.com').trim();
 
-    if (gmailUser && appPass) {
+    let emailSent = false;
+    let emailErrorMessage: string | null = null;
+
+    if (gmailUser && gmailPass) {
       try {
         const transporter = nodemailer.createTransport({
           host: 'smtp.gmail.com',
@@ -95,7 +120,7 @@ export async function POST(req: NextRequest) {
           secure: true,
           auth: {
             user: gmailUser,
-            pass: appPass,
+            pass: gmailPass,
           },
         });
 
@@ -142,12 +167,12 @@ export async function POST(req: NextRequest) {
                   </div>
                   <div style="margin-bottom: 8px;">
                     <span style="color: #64748B; font-weight: 600;">Payer Name:</span>
-                    <strong style="color: #0F172A; float: right;">${payerName || 'Not specified'}</strong>
+                    <strong style="color: #0F172A; float: right;">${cleanPayerName}</strong>
                     <div style="clear: both;"></div>
                   </div>
                   <div style="margin-bottom: 8px;">
                     <span style="color: #64748B; font-weight: 600;">User Email:</span>
-                    <span style="color: #0F172A; float: right;">${userEmail || 'N/A'}</span>
+                    <span style="color: #0F172A; float: right;">${cleanEmail}</span>
                     <div style="clear: both;"></div>
                   </div>
                   <div>
@@ -175,19 +200,21 @@ export async function POST(req: NextRequest) {
           </html>
         `;
 
-        // STRICTLY AWAIT transporter.sendMail before returning response
+        // STRICTLY AWAIT transporter.sendMail before returning
         await transporter.sendMail({
           from: `"Catfisher Pond" <${gmailUser}>`,
-          to: adminRecipient,
+          to: notifyTo,
           subject: `💰 New ₹${verifiedAmount} Catfisher Payment — UTR ${cleanUtr}`,
           html: htmlContent,
         });
-      } catch (mailError) {
-        console.warn('Failed to send admin notification email:', mailError);
-        // Do not fail the API call if mail fails, request is safely recorded in Firestore
+        emailSent = true;
+      } catch (mailError: any) {
+        console.error('Nodemailer sendMail failed:', mailError);
+        emailErrorMessage = mailError?.message || 'SMTP delivery failed';
       }
     } else {
-      console.info('ADMIN_GMAIL_USER/ADMIN_GMAIL_APP_PASSWORD not configured. UTR saved to Firestore.');
+      console.warn('Gmail credentials missing: ADMIN_GMAIL_USER or ADMIN_GMAIL_APP_PASSWORD.');
+      emailErrorMessage = 'Gmail credentials not configured in environment.';
     }
 
     return NextResponse.json({
@@ -195,7 +222,10 @@ export async function POST(req: NextRequest) {
       utr: cleanUtr,
       amount: verifiedAmount,
       planTier,
-      message: 'Payment request recorded. Will be reviewed in less than 24 hours.',
+      firestoreSaved,
+      emailSent,
+      emailError: emailErrorMessage,
+      message: 'Payment request submitted! Approval in less than 24 hours.',
     });
   } catch (error: any) {
     console.error('Submit payment request error:', error);
