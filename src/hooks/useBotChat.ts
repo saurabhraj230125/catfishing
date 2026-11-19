@@ -62,7 +62,9 @@ export function useBotChat({
     if (!shouldSendOpener) return;
 
     const botOpeners =
-      persona.presentedGender === 'girl'
+      persona.openerPool && persona.openerPool.length > 0
+        ? persona.openerPool
+        : persona.presentedGender === 'girl'
         ? ['heyy :)', 'kya scene?', 'heyy kahan se ho?', 'sup', 'heyy']
         : ['yo', 'sup bro', 'kya scene?', 'heyy', 'kahan se ho?'];
     const selectedOpener = botOpeners[Math.floor(Math.random() * botOpeners.length)];

@@ -42,6 +42,8 @@ export interface PublicPondProfile {
   secretIdentity: SecretIdentity;
 }
 
+export type BotMood = 'playful' | 'skeptical' | 'bored' | 'flirty' | 'chaotic';
+
 export interface StealthPersona {
   id: string;
   displayName: string;
@@ -52,7 +54,11 @@ export interface StealthPersona {
   bio: string;
   vibes: string[];
   city: string;
+  age?: number;
+  vibe?: string;
+  textingStyle?: string;
   personalityTraits: string;
+  mood?: BotMood;
   openerPool: string[];
   fallbackReplies: string[];
 }

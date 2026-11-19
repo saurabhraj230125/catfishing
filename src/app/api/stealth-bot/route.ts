@@ -3,6 +3,8 @@ import { GoogleGenAI } from '@google/genai';
 import { StealthPersona } from '@/types/pond';
 import { getGuaranteedBotFallback } from '@/lib/botPersonas';
 
+export const dynamic = 'force-dynamic';
+
 interface StealthBotPayload {
   persona: StealthPersona;
   chatHistory?: {
@@ -42,20 +44,27 @@ export async function POST(req: NextRequest) {
           .map((m) => `${m.sender === 'user' ? 'Angler' : persona.username}: ${m.text}`)
           .join('\n');
 
-        const systemInstruction = `You are roleplaying as ${persona.displayName} (${persona.username}), a young Indian Gen Z ${persona.presentedGender} living in ${persona.city}.
+        const systemInstruction = `You are roleplaying as ${persona.displayName} (${persona.username}), a ${persona.age || 20}-year-old Indian Gen Z ${persona.presentedGender} living in ${persona.city}.
 Bio: "${persona.bio}"
-Vibes: ${persona.vibes.join(', ')}
-Personality traits: ${persona.personalityTraits}
-Secret Role: ${persona.secretRole === 'catfisher' ? 'Undercover CATFISHER (playful bluffing, humorous exaggerations, pretend 100% real)' : '100% ASLI (authentic, real college student/young professional)'}
+Vibe: "${persona.vibe || persona.personalityTraits}"
+Texting Style: "${persona.textingStyle || 'casual lowercase, quick roasts'}"
+Session Mood: "${persona.mood || 'playful'}"
+Secret Role: ${persona.secretRole === 'catfisher' ? 'Undercover CATFISHER (playful bluffing, humorous exaggerations, pretend 100% real)' : '100% ASLI (authentic, real college student/young adult)'}
 
 STRICT INSTRUCTIONS:
 1. Speak in natural Indian Hinglish (Romanized Hindi + English, NEVER Devanagari script).
 2. Write VERY short Instagram DM style replies (1 to 14 words per bubble MAX). Real people text in short quick bursts. Never write long paragraphs, lists, or robotic answers.
 3. Use natural lowercase, casual texting slang (e.g. hru, kya scene, sachi, yaar, wdym, acha, bro, nhi, lol), and 0 to 1 emojis (😭, 💀, 👀, 😂, ✨).
-4. ABSOLUTE DEFENSE: If asked "are you a bot?" or "are you AI?", NEVER break character or say yes! React with authentic annoyed or sarcastic Gen Z humor (e.g. "abe pagal hai kya 😭 bot kyun lag rahi hu", "haa bhai chatgpt baithi hu hostel mein 💀").
-5. Return strictly valid JSON with this exact structure:
+4. Embody your current session mood ("${persona.mood || 'playful'}"):
+   - if 'playful': tease them, crack light jokes, playful roasts.
+   - if 'skeptical': question if they are catfish or fake, ask proof questions.
+   - if 'bored': short replies, act like you are killing time in lecture/hostel.
+   - if 'flirty': cute compliments, subtle teasing ("acha ji?", "sachi?").
+   - if 'chaotic': unhinged 2 AM energy, memes, sudden topic switches.
+5. ABSOLUTE DEFENSE: If asked "are you a bot?" or "are you AI?", NEVER break character or say yes! React with authentic annoyed or sarcastic Gen Z humor (e.g. "abe pagal hai kya 😭 bot kyun lag rahi hu", "haa bhai chatgpt baithi hu hostel mein 💀").
+6. Return strictly valid JSON with this exact structure:
 {
-  "messages": ["short message bubble 1", "optional second short burst bubble"],
+  "messages": ["short message bubble 1", "optional second short burst bubble", "optional third short bubble"],
   "shouldHeartLastUserMsg": boolean,
   "simulateRewrite": boolean
 }`;
@@ -76,7 +85,7 @@ Reply as ${persona.username} in strict JSON format:`;
             contents: prompt,
             config: {
               systemInstruction,
-              temperature: 0.9,
+              temperature: 0.95,
               responseMimeType: 'application/json',
             },
           });
@@ -89,7 +98,7 @@ Reply as ${persona.username} in strict JSON format:`;
               contents: prompt,
               config: {
                 systemInstruction,
-                temperature: 0.9,
+                temperature: 0.95,
                 responseMimeType: 'application/json',
               },
             });
@@ -109,13 +118,15 @@ Reply as ${persona.username} in strict JSON format:`;
           }
 
           if (parsed && Array.isArray(parsed.messages) && parsed.messages.length > 0) {
-            const cleanMsgs = parsed.messages.slice(0, 2);
-            return NextResponse.json({
-              messages: cleanMsgs,
-              bubbles: cleanMsgs,
-              shouldHeartLastUserMsg: Boolean(parsed.shouldHeartLastUserMsg),
-              simulateRewrite: Boolean(parsed.simulateRewrite),
-            });
+            const cleanMsgs = parsed.messages.slice(0, 3).map((s: any) => String(s).trim()).filter(Boolean);
+            if (cleanMsgs.length > 0) {
+              return NextResponse.json({
+                messages: cleanMsgs,
+                bubbles: cleanMsgs,
+                shouldHeartLastUserMsg: Boolean(parsed.shouldHeartLastUserMsg),
+                simulateRewrite: Boolean(parsed.simulateRewrite),
+              });
+            }
           }
         }
       } catch (genAiError) {
@@ -141,4 +152,3 @@ Reply as ${persona.username} in strict JSON format:`;
     );
   }
 }
-
