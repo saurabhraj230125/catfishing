@@ -72,6 +72,39 @@ export interface QueueEntry {
   roomId: string | null;
   ignoreGenderFilter?: boolean;
   createdAt: any;
+  lastHeartbeat?: any;
+}
+
+export type ChatSession =
+  | { type: 'human'; roomId: string; partner: PublicPondProfile }
+  | { type: 'bot'; roomId: string; partner: StealthPersona };
+
+export interface PendingUpiOrder {
+  orderCode: string;
+  uid: string;
+  userEmail?: string;
+  planTier: 'pro_100' | 'unlimited';
+  baseAmount: number;
+  exactAmount: number;
+  status: 'pending' | 'paid' | 'expired';
+  createdAt: number;
+  expiresAt: number;
+  paidAt?: number;
+  detectedUtr?: string;
+  rawNotification?: string;
+}
+
+export interface PaymentRequest {
+  utr: string;
+  orderCode: string;
+  uid: string;
+  userEmail?: string;
+  planTier: 'pro_100' | 'unlimited';
+  exactAmount: number;
+  status: 'submitted' | 'approved' | 'rejected';
+  createdAt: number;
+  reviewedAt?: number;
+  adminNote?: string;
 }
 
 export interface ChatRoomDoc {

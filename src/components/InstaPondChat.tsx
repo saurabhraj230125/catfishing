@@ -7,7 +7,7 @@ import {
   PublicPondProfile, 
   ChatMessage, 
   SecretIdentity,
-  StealthPersona
+  ChatSession 
 } from '@/types/pond';
 import {
   subscribeToChatRoom,
@@ -17,6 +17,7 @@ import {
   updateTypingTelemetry,
   leaveChatRoom,
 } from '@/lib/matchmaker';
+import { getGuaranteedBotFallback } from '@/lib/botPersonas';
 import { useChatTimer } from '@/hooks/useChatTimer';
 import { PricingModal } from '@/components/PricingModal';
 import { 
@@ -30,7 +31,6 @@ import {
   XCircle,
   ShieldAlert,
   Smile,
-  Sparkles,
   Clock
 } from 'lucide-react';
 import {
@@ -45,17 +45,13 @@ import {
 import { trackEvent } from '@/lib/analytics';
 
 interface InstaPondChatProps {
-  roomId: string;
+  activeSession: ChatSession;
   currentUser: UserProfile;
-  opponent: PublicPondProfile;
-  isBotRoom?: boolean;
-  botPersona?: StealthPersona;
   onNextMatch: (reward: { xpGained: number; isCorrect: boolean }) => void;
   onExit: () => void;
 }
 
 const QUICK_REACTION_EMOJIS = ['❤️', '😂', '💀', '🔥', '🚩', '🧢', '🎣'];
-
 const QUICK_INPUT_EMOJIS = ['❤️', '😂', '💀', '🔥', '🚩', '🧢', '👀', '🎣', '☕', '✨', '😭', '🙏'];
 
 const SAVAGE_HINGLISH_LINES = [
@@ -72,14 +68,29 @@ const SAVAGE_HINGLISH_LINES = [
 ];
 
 export function InstaPondChat({
-  roomId,
+  activeSession,
   currentUser,
-  opponent,
-  isBotRoom = false,
-  botPersona,
   onNextMatch,
   onExit,
 }: InstaPondChatProps) {
+  const roomId = activeSession.roomId;
+  const isBot = activeSession.type === 'bot';
+
+  // Partner display projection
+  const opponent: PublicPondProfile =
+    activeSession.type === 'bot'
+      ? {
+          uid: `stealth_${activeSession.partner.username}`,
+          displayName: activeSession.partner.displayName,
+          username: activeSession.partner.username,
+          avatar: activeSession.partner.avatar,
+          bio: activeSession.partner.bio,
+          vibes: activeSession.partner.vibes,
+          presentedGender: activeSession.partner.presentedGender,
+          secretIdentity: activeSession.partner.secretRole,
+        }
+      : activeSession.partner;
+
   const [messages, setMessages] = useState<ChatMessage[]>([]);
   const [inputText, setInputText] = useState('');
   const [opponentTyping, setOpponentTyping] = useState<{ isTyping: boolean; backspaces: number }>({
@@ -89,15 +100,19 @@ export function InstaPondChat({
   const [isOpponentDisconnected, setIsOpponentDisconnected] = useState(false);
   const [isProfileDrawerOpen, setIsProfileDrawerOpen] = useState(false);
   const [showEmojiPickerForMsg, setShowEmojiPickerForMsg] = useState<string | null>(null);
-  const [showQuickEmojiBar, setShowQuickEmojiBar] = useState(true);
 
   // Live Guess Switch (Top Right): ✨ Normal vs 🎣 Catfisher
   const [userGuess, setUserGuess] = useState<SecretIdentity>('normal');
 
-  // Keystroke & Backspace telemetry
+  // Keystroke & telemetry refs
   const backspaceCountRef = useRef(0);
   const typingTimeoutRef = useRef<NodeJS.Timeout | null>(null);
-  const isBotReplyingRef = useRef(false);
+
+  // Bot choreography & debounce refs
+  const botDebounceRef = useRef<NodeJS.Timeout | null>(null);
+  const botTypingTimersRef = useRef<NodeJS.Timeout[]>([]);
+  const botAbortControllerRef = useRef<AbortController | null>(null);
+  const queuedUserMsgsRef = useRef<string[]>([]);
 
   // 3-Second "KHATAM HO GAYA BHAIYA MATTER!" Truth Reveal Overlay state
   const [showTruthReveal, setShowTruthReveal] = useState(false);
@@ -132,9 +147,10 @@ export function InstaPondChat({
     },
   });
 
-  // Subscribe to real-time messages & room updates for live human matches
+  // 1. DECOUPLED FIRESTORE LISTENER (Guarded strictly for human sessions only)
   useEffect(() => {
-    if (isBotRoom) return;
+    // CRITICAL BUG FIX: Never attach Firestore listeners to bot sessions
+    if (!activeSession || activeSession.type === 'bot') return;
 
     const unsubscribe = subscribeToChatRoom(roomId, currentUser.uid, {
       onMessage: (newMsg) => {
@@ -165,11 +181,12 @@ export function InstaPondChat({
       unsubscribe();
       leaveChatRoom(roomId, currentUser.uid).catch(() => {});
     };
-  }, [roomId, currentUser.uid, isBotRoom]);
+  }, [roomId, currentUser.uid, activeSession]);
 
-  // Stealth Partner Opener (50% chance on entering stealth room)
+  // 2. STEALTH BOT OPENER (Natural 55% chance drop)
   useEffect(() => {
-    if (!isBotRoom || !botPersona) return;
+    if (!activeSession || activeSession.type !== 'bot') return;
+    const botPersona = activeSession.partner;
 
     const shouldOpen = Math.random() < 0.55;
     if (shouldOpen) {
@@ -178,11 +195,11 @@ export function InstaPondChat({
           ? ['heyy :)', 'kya scene?', 'heyy kahan se ho?', 'sup', 'heyy']
           : ['yo', 'sup bro', 'kya scene?', 'heyy', 'kahan se ho?'];
       const randomOpener = openers[Math.floor(Math.random() * openers.length)];
-      const delay = 1400 + Math.random() * 1200;
+      const delay = 1300 + Math.random() * 1100;
 
       const timer = setTimeout(() => {
         setOpponentTyping({ isTyping: true, backspaces: 0 });
-        setTimeout(() => {
+        const typingDelay = setTimeout(() => {
           setOpponentTyping({ isTyping: false, backspaces: 0 });
           const newMsg: ChatMessage = {
             id: `msg_stealth_${Date.now()}`,
@@ -193,104 +210,193 @@ export function InstaPondChat({
           };
           setMessages((prev) => [...prev, newMsg]);
           playMessageReceiveSound();
-        }, 800 + Math.random() * 500);
+        }, 750 + Math.random() * 400);
+        botTypingTimersRef.current.push(typingDelay);
       }, delay);
 
-      return () => clearTimeout(timer);
+      botTypingTimersRef.current.push(timer);
     }
-  }, [isBotRoom, botPersona, opponent.uid]);
+
+    return () => {
+      if (botDebounceRef.current) clearTimeout(botDebounceRef.current);
+      botTypingTimersRef.current.forEach((t) => clearTimeout(t));
+      botTypingTimersRef.current = [];
+      if (botAbortControllerRef.current) {
+        botAbortControllerRef.current.abort();
+      }
+    };
+  }, [activeSession, opponent.uid]);
 
   // Auto-scroll on new message
   useEffect(() => {
     messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
   }, [messages, opponentTyping.isTyping]);
 
-  // Stealth Partner Reply Pipeline
-  const triggerBotReply = async (userText: string, currentHistory: ChatMessage[], userMsgId: string) => {
-    if (isBotReplyingRef.current || !botPersona) return;
-    isBotReplyingRef.current = true;
+  // 3. EXECUTE BOT REPLY PIPELINE (With 10s AbortController and instant Hinglish fallback)
+  const executeBotReply = async (
+    userText: string,
+    currentHistory: ChatMessage[],
+    userMsgId: string
+  ) => {
+    if (activeSession.type !== 'bot') return;
+    const botPersona = activeSession.partner;
 
-    const initialPause = 500 + Math.random() * 700;
-    setTimeout(async () => {
+    if (botAbortControllerRef.current) {
+      botAbortControllerRef.current.abort();
+    }
+    const abortController = new AbortController();
+    botAbortControllerRef.current = abortController;
+
+    const pauseTimer = setTimeout(() => {
       setOpponentTyping({ isTyping: true, backspaces: 0 });
+    }, 450);
+    botTypingTimersRef.current.push(pauseTimer);
 
-      try {
-        const historyForApi = currentHistory.map((m) => ({
-          sender: m.senderUid === currentUser.uid ? ('user' as const) : ('bot' as const),
-          text: m.text,
-        }));
+    let replyData: {
+      messages: string[];
+      shouldHeartLastUserMsg: boolean;
+      simulateRewrite: boolean;
+    };
 
-        const res = await fetch('/api/stealth-bot', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({
-            persona: botPersona,
-            userGender: currentUser.presentedGender,
-            messages: historyForApi,
-            userMessage: userText,
-          }),
-        });
+    try {
+      const historyPayload = currentHistory.slice(-8).map((m) => ({
+        sender: (m.senderUid === currentUser.uid ? 'user' : 'partner') as 'user' | 'partner',
+        text: m.text,
+      }));
 
-        const data = await res.json();
-        const bubbles: string[] =
-          Array.isArray(data.bubbles) && data.bubbles.length > 0
-            ? data.bubbles
-            : ['arre sahi h haha'];
+      const timeoutId = setTimeout(() => abortController.abort(), 10000);
 
-        // Simulate backspace/delete tell if flagged
-        if (data.simulateRewrite) {
-          setOpponentTyping({ isTyping: true, backspaces: 8 });
-          await new Promise((r) => setTimeout(r, 1100 + Math.random() * 600));
-        }
+      const res = await fetch('/api/stealth-bot', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          persona: botPersona,
+          userGender: currentUser.presentedGender,
+          messages: historyPayload,
+          userMessage: userText,
+        }),
+        signal: abortController.signal,
+      });
+      clearTimeout(timeoutId);
 
-        // Sequential multi-bubble delivery
-        for (let i = 0; i < bubbles.length; i++) {
-          const bubbleText = bubbles[i];
-          setOpponentTyping({ isTyping: true, backspaces: 0 });
-          await new Promise((r) => setTimeout(r, 600 + Math.random() * 700));
+      if (res.ok) {
+        const json = await res.json();
+        const bubbles = Array.isArray(json.messages) && json.messages.length > 0
+          ? json.messages
+          : Array.isArray(json.bubbles) && json.bubbles.length > 0
+          ? json.bubbles
+          : null;
 
-          setOpponentTyping({ isTyping: false, backspaces: 0 });
-          const botBubble: ChatMessage = {
-            id: `msg_stealth_${Date.now()}_${i}`,
-            senderUid: opponent.uid,
-            text: bubbleText,
-            hearted: false,
-            createdAt: new Date(),
+        if (bubbles) {
+          replyData = {
+            messages: bubbles,
+            shouldHeartLastUserMsg: Boolean(json.shouldHeartLastUserMsg),
+            simulateRewrite: Boolean(json.simulateRewrite),
           };
-          setMessages((prev) => [...prev, botBubble]);
-          playMessageReceiveSound();
-
-          if (i < bubbles.length - 1) {
-            await new Promise((r) => setTimeout(r, 400 + Math.random() * 400));
-          }
+        } else {
+          replyData = getGuaranteedBotFallback(userText, botPersona);
         }
-
-        // Double-tap heart user's last message if flagged
-        if (data.shouldHeartLastUserMsg) {
-          setTimeout(() => {
-            setMessages((prev) =>
-              prev.map((m) =>
-                m.id === userMsgId ? { ...m, hearted: true, reaction: '❤️' } : m
-              )
-            );
-            playReactionSound();
-          }, 700);
-        }
-      } catch (err) {
-        console.warn('Stealth partner response notice:', err);
-      } finally {
-        isBotReplyingRef.current = false;
-        setOpponentTyping({ isTyping: false, backspaces: 0 });
+      } else {
+        replyData = getGuaranteedBotFallback(userText, botPersona);
       }
-    }, initialPause);
+    } catch {
+      replyData = getGuaranteedBotFallback(userText, botPersona);
+    }
+
+    if (abortController.signal.aborted) return;
+
+    // Simulated backspace rewrite tell if flagged
+    if (replyData.simulateRewrite) {
+      setOpponentTyping({ isTyping: true, backspaces: 8 });
+      await new Promise((r) => setTimeout(r, 900 + Math.random() * 400));
+    }
+
+    // Deliver bubbles sequentially
+    for (let i = 0; i < replyData.messages.length; i++) {
+      if (abortController.signal.aborted) return;
+
+      const bubble = replyData.messages[i];
+      setOpponentTyping({ isTyping: true, backspaces: 0 });
+      await new Promise((r) => setTimeout(r, 550 + Math.random() * 500));
+
+      setOpponentTyping({ isTyping: false, backspaces: 0 });
+      const newBotMsg: ChatMessage = {
+        id: `bot_msg_${Date.now()}_${i}`,
+        senderUid: opponent.uid,
+        text: bubble,
+        hearted: false,
+        createdAt: new Date(),
+      };
+      setMessages((prev) => [...prev, newBotMsg]);
+      playMessageReceiveSound();
+
+      if (i < replyData.messages.length - 1) {
+        await new Promise((r) => setTimeout(r, 350 + Math.random() * 300));
+      }
+    }
+
+    // Double-tap heart user's last message if flagged
+    if (replyData.shouldHeartLastUserMsg) {
+      const heartTimer = setTimeout(() => {
+        setMessages((prev) =>
+          prev.map((m) =>
+            m.id === userMsgId ? { ...m, hearted: true, reaction: '❤️' } : m
+          )
+        );
+        playReactionSound();
+      }, 700);
+      botTypingTimersRef.current.push(heartTimer);
+    }
   };
 
-  // Handle typing telemetry
+  // 4. INSTANT OPTIMISTIC SEND + 900ms DEBOUNCED QUEUE
+  const handleSend = () => {
+    if (!inputText.trim() || isExpired || isOpponentDisconnected) return;
+    const text = inputText.trim();
+    setInputText('');
+    backspaceCountRef.current = 0;
+
+    playMessageSendSound();
+    trackEvent('chat_message_sent', { roomId });
+
+    const userMsgId = `msg_${Date.now()}_${Math.random().toString(36).substring(2, 6)}`;
+    const userMsg: ChatMessage = {
+      id: userMsgId,
+      senderUid: currentUser.uid,
+      text,
+      hearted: false,
+      createdAt: new Date(),
+    };
+
+    // Instant optimistic UI update: never lag or wait
+    const nextHistory = [...messages, userMsg];
+    setMessages(nextHistory);
+
+    if (activeSession.type === 'bot') {
+      queuedUserMsgsRef.current.push(text);
+
+      // Cancel previous debounce timer and restart fresh 900ms
+      if (botDebounceRef.current) {
+        clearTimeout(botDebounceRef.current);
+      }
+
+      botDebounceRef.current = setTimeout(() => {
+        const combined = queuedUserMsgsRef.current.join(' \n ');
+        queuedUserMsgsRef.current = [];
+        executeBotReply(combined, nextHistory, userMsgId);
+      }, 900);
+    } else {
+      if (typingTimeoutRef.current) clearTimeout(typingTimeoutRef.current);
+      sendChatMessage(roomId, currentUser.uid, text).catch(() => {});
+    }
+  };
+
+  // Typing telemetry for real-human chat
   const handleInputChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-    if (isExpired) return;
+    if (isExpired || isOpponentDisconnected) return;
     setInputText(e.target.value);
 
-    if (!isBotRoom) {
+    if (activeSession.type === 'human') {
       updateTypingTelemetry(roomId, currentUser.uid, true, backspaceCountRef.current).catch(() => {});
 
       if (typingTimeoutRef.current) clearTimeout(typingTimeoutRef.current);
@@ -301,7 +407,7 @@ export function InstaPondChat({
   };
 
   const handleKeyDown = (e: React.KeyboardEvent<HTMLInputElement>) => {
-    if (isExpired) return;
+    if (isExpired || isOpponentDisconnected) return;
     if (e.key === 'Backspace') {
       backspaceCountRef.current += 1;
     } else if (e.key === 'Enter') {
@@ -310,40 +416,12 @@ export function InstaPondChat({
     }
   };
 
-  const handleSend = async () => {
-    if (!inputText.trim() || isExpired) return;
-    const text = inputText;
-    setInputText('');
-    backspaceCountRef.current = 0;
-
-    playMessageSendSound();
-    trackEvent('chat_message_sent', { roomId });
-
-    const userMsgId = `msg_${Date.now()}`;
-    const userMsg: ChatMessage = {
-      id: userMsgId,
-      senderUid: currentUser.uid,
-      text,
-      hearted: false,
-      createdAt: new Date(),
-    };
-
-    if (isBotRoom) {
-      const nextHistory = [...messages, userMsg];
-      setMessages(nextHistory);
-      triggerBotReply(text, nextHistory, userMsgId);
-    } else {
-      if (typingTimeoutRef.current) clearTimeout(typingTimeoutRef.current);
-      await sendChatMessage(roomId, currentUser.uid, text);
-    }
-  };
-
   // Double-tap or double-click to heart a message
   const handleDoubleTapMessage = async (msg: ChatMessage) => {
     playReactionSound();
     trackEvent('chat_message_hearted');
 
-    if (isBotRoom) {
+    if (activeSession.type === 'bot') {
       setMessages((prev) =>
         prev.map((m) =>
           m.id === msg.id
@@ -363,9 +441,11 @@ export function InstaPondChat({
     setShowEmojiPickerForMsg(null);
     trackEvent('chat_reaction_selected', { emoji });
 
-    if (isBotRoom) {
+    if (activeSession.type === 'bot') {
       setMessages((prev) =>
-        prev.map((m) => (m.id === msgId ? { ...m, reaction: emoji } : m))
+        prev.map((m) =>
+          m.id === msgId ? { ...m, reaction: emoji, hearted: emoji === '❤️' } : m
+        )
       );
       return;
     }
@@ -373,16 +453,14 @@ export function InstaPondChat({
     await setMessageReaction(roomId, msgId, emoji);
   };
 
-  // Append emoji to input text
   const handleAppendEmoji = (emoji: string) => {
-    if (isExpired) return;
+    if (isExpired || isOpponentDisconnected) return;
     triggerHaptic('light');
     setInputText((prev) => `${prev}${emoji}`);
   };
 
-  // Insert Savage Hinglish Line Roulette
   const handleRandomSavageLine = () => {
-    if (isExpired) return;
+    if (isExpired || isOpponentDisconnected) return;
     playDiceRollSound();
     trackEvent('chat_savage_line_roulette');
     const randomPick = SAVAGE_HINGLISH_LINES[Math.floor(Math.random() * SAVAGE_HINGLISH_LINES.length)];
@@ -391,12 +469,23 @@ export function InstaPondChat({
 
   // Trigger Skip / Next with "KHATAM HO GAYA BHAIYA MATTER!" Reveal
   const handleTriggerNext = async () => {
-    if (!isBotRoom) {
+    // Clear all bot timeouts immediately so old replies never leak into next room
+    if (botDebounceRef.current) clearTimeout(botDebounceRef.current);
+    botTypingTimersRef.current.forEach((t) => clearTimeout(t));
+    botTypingTimersRef.current = [];
+    if (botAbortControllerRef.current) {
+      botAbortControllerRef.current.abort();
+    }
+    queuedUserMsgsRef.current = [];
+
+    if (activeSession.type === 'human') {
       await leaveChatRoom(roomId, currentUser.uid).catch(() => {});
     }
 
     const actualRole: SecretIdentity =
-      botPersona?.secretRole || opponent.secretIdentity || 'normal';
+      activeSession.type === 'bot'
+        ? activeSession.partner.secretRole
+        : activeSession.partner.secretIdentity || 'normal';
     const isCorrect = userGuess === actualRole;
     const xpGained = isCorrect ? 50 : 0;
 
@@ -441,7 +530,7 @@ export function InstaPondChat({
           <button
             onClick={() => setIsProfileDrawerOpen(!isProfileDrawerOpen)}
             type="button"
-            className="flex items-center gap-2 text-left group hover:opacity-90 transition-opacity min-w-0"
+            className="flex items-center gap-2 text-left group hover:opacity-90 transition-opacity min-w-0 cursor-pointer"
           >
             <div className="p-0.5 rounded-full insta-story-ring flex-shrink-0">
               <div className="w-8 h-8 sm:w-9 sm:h-9 rounded-full bg-white p-0.5">
@@ -511,7 +600,7 @@ export function InstaPondChat({
                   playReactionSound();
                 }}
                 type="button"
-                className={`px-2 sm:px-2.5 py-0.5 sm:py-1 rounded-full text-[10px] sm:text-[11px] font-black transition-all ${
+                className={`px-2 sm:px-2.5 py-0.5 sm:py-1 rounded-full text-[10px] sm:text-[11px] font-black transition-all cursor-pointer ${
                   userGuess === 'normal'
                     ? 'bg-sky-600 text-white shadow-xs'
                     : 'text-slate-600 hover:text-slate-900'
@@ -526,7 +615,7 @@ export function InstaPondChat({
                   playReactionSound();
                 }}
                 type="button"
-                className={`px-2 sm:px-2.5 py-0.5 sm:py-1 rounded-full text-[10px] sm:text-[11px] font-black transition-all ${
+                className={`px-2 sm:px-2.5 py-0.5 sm:py-1 rounded-full text-[10px] sm:text-[11px] font-black transition-all cursor-pointer ${
                   userGuess === 'catfisher'
                     ? 'bg-rose-600 text-white shadow-xs'
                     : 'text-slate-600 hover:text-slate-900'
@@ -539,9 +628,7 @@ export function InstaPondChat({
           </div>
         </div>
 
-        {/* ========================================================
-            SAFETY WARNING BANNER (Requested by User)
-            ======================================================== */}
+        {/* Safety Warning Banner */}
         <div className="bg-amber-50/95 border-b border-amber-200 px-3 py-1.5 flex items-center justify-between text-[10px] sm:text-[11px] text-amber-900 font-semibold z-10 shadow-2xs">
           <div className="flex items-center gap-1.5 min-w-0">
             <ShieldAlert className="w-3.5 h-3.5 text-amber-600 flex-shrink-0" />
@@ -551,9 +638,7 @@ export function InstaPondChat({
           </div>
         </div>
 
-        {/* ========================================================
-            EXPANDABLE MINI-BIO STRIP (Bio + Vibe Pills)
-            ======================================================== */}
+        {/* Expandable Mini-Bio Strip */}
         <AnimatePresence>
           {isProfileDrawerOpen && (
             <motion.div
@@ -589,7 +674,7 @@ export function InstaPondChat({
             <button
               onClick={handleTriggerNext}
               type="button"
-              className="font-extrabold underline text-rose-800 hover:text-rose-950 ml-2"
+              className="font-extrabold underline text-rose-800 hover:text-rose-950 ml-2 cursor-pointer"
             >
               Next →
             </button>
@@ -711,7 +796,6 @@ export function InstaPondChat({
                 />
               </div>
 
-              {/* Psychological Rewrite Detector (when backspaces > 6) */}
               {opponentTyping.backspaces > 6 && (
                 <span className="text-[10px] font-bold text-amber-700 bg-amber-50 px-2 py-0.5 rounded-full border border-amber-200 animate-pulse">
                   👀 @{opponent.username} erased text ({opponentTyping.backspaces} backspaces)...
@@ -731,9 +815,7 @@ export function InstaPondChat({
           </div>
         )}
 
-        {/* ========================================================
-            QUICK EMOJI BAR (Requested by User)
-            ======================================================== */}
+        {/* Quick Emoji Bar */}
         <div className="px-2.5 py-1 bg-slate-50/90 border-t border-slate-100 flex items-center gap-1.5 overflow-x-auto no-scrollbar">
           <span className="text-[10px] font-bold text-slate-400 flex items-center gap-0.5 flex-shrink-0">
             <Smile className="w-3 h-3 text-slate-400" />
@@ -743,8 +825,9 @@ export function InstaPondChat({
             <button
               key={emoji}
               type="button"
+              disabled={isExpired || isOpponentDisconnected}
               onClick={() => handleAppendEmoji(emoji)}
-              className="text-sm px-1 py-0.5 hover:scale-125 transition-transform flex-shrink-0"
+              className="text-sm px-1 py-0.5 hover:scale-125 transition-transform flex-shrink-0 cursor-pointer disabled:opacity-40"
               title={`Add ${emoji}`}
             >
               {emoji}
@@ -752,9 +835,7 @@ export function InstaPondChat({
           ))}
         </div>
 
-        {/* ========================================================
-            QUOTA EXPIRED BANNER (If 5-minute quota finished)
-            ======================================================== */}
+        {/* Quota Expired Alert Banner */}
         {isExpired && (
           <div className="bg-rose-50 border-t border-rose-200 px-3 py-2 flex items-center justify-between text-xs font-black text-rose-800 z-10 shadow-xs">
             <span className="truncate">⏰ Angler Minutes Finished (00:00)! Refill to chat.</span>
@@ -770,6 +851,7 @@ export function InstaPondChat({
 
         {/* ========================================================
             BOTTOM BAR: NEXT BUTTON + PILL INPUT + SAVAGE DICE
+            NEVER DISABLES INPUT WHILE BOT IS TYPING
             ======================================================== */}
         <div className="p-2 sm:p-3 border-t border-slate-100 bg-white flex items-center gap-2">
           {/* Coral NEXT (Cut Line) Button */}
@@ -779,21 +861,21 @@ export function InstaPondChat({
             onClick={handleTriggerNext}
             title="Cut line & skip to next match"
             type="button"
-            className="flex items-center gap-1 px-3 py-2 sm:py-2.5 rounded-2xl bg-rose-500 hover:bg-rose-600 text-white font-black text-xs shadow-md shadow-rose-500/20 transition-all flex-shrink-0"
+            className="flex items-center gap-1 px-3 py-2 sm:py-2.5 rounded-2xl bg-rose-500 hover:bg-rose-600 text-white font-black text-xs shadow-md shadow-rose-500/20 transition-all flex-shrink-0 cursor-pointer"
           >
             <Scissors className="w-3.5 h-3.5 stroke-[2.5]" />
             <span>NEXT</span>
           </motion.button>
 
-          {/* Rounded Instagram Pill Input with "🎲 Savage Line" Roulette */}
+          {/* Rounded Instagram Pill Input */}
           <div className="flex-1 relative flex items-center">
             <button
               onClick={handleRandomSavageLine}
-              disabled={isExpired}
+              disabled={isExpired || isOpponentDisconnected}
               title="🎲 Savage Icebreaker Roulette"
               type="button"
               className={`absolute left-2 p-1 rounded-full text-slate-600 transition-colors z-10 ${
-                isExpired ? 'opacity-40 cursor-not-allowed' : 'hover:bg-slate-200'
+                isExpired || isOpponentDisconnected ? 'opacity-40 cursor-not-allowed' : 'hover:bg-slate-200 cursor-pointer'
               }`}
             >
               <Dices className="w-4 h-4 text-indigo-600" />
@@ -802,29 +884,31 @@ export function InstaPondChat({
             <input
               type="text"
               value={inputText}
-              disabled={isExpired}
+              disabled={isExpired || isOpponentDisconnected}
               onChange={handleInputChange}
               onKeyDown={handleKeyDown}
               placeholder={
                 isExpired
                   ? '⏰ Angler quota expired! Refill to continue...'
+                  : isOpponentDisconnected
+                  ? 'Opponent has cut the line. Tap NEXT to rematch.'
                   : `Message ${opponent.username}...`
               }
               className={`w-full pl-8 pr-10 py-2 sm:py-2.5 rounded-full text-base sm:text-sm text-slate-900 border transition-all font-medium touch-manipulation ${
-                isExpired
+                isExpired || isOpponentDisconnected
                   ? 'bg-slate-100 border-slate-300 text-slate-400 cursor-not-allowed'
                   : 'bg-slate-100 hover:bg-slate-200/60 focus:bg-white border-slate-200 focus:outline-none focus:ring-2 focus:ring-purple-500'
               }`}
             />
 
-            {inputText.trim() && !isExpired && (
+            {inputText.trim() && !isExpired && !isOpponentDisconnected && (
               <motion.button
                 initial={{ scale: 0 }}
                 animate={{ scale: 1 }}
                 whileTap={{ scale: 0.9 }}
                 onClick={handleSend}
                 type="button"
-                className="absolute right-1.5 p-1.5 rounded-full bg-gradient-to-r from-purple-600 to-pink-600 text-white shadow-xs"
+                className="absolute right-1.5 p-1.5 rounded-full bg-gradient-to-r from-purple-600 to-pink-600 text-white shadow-xs cursor-pointer"
               >
                 <Send className="w-3.5 h-3.5 stroke-[2.5]" />
               </motion.button>
@@ -918,12 +1002,14 @@ export function InstaPondChat({
         </AnimatePresence>
       </motion.div>
 
-      {/* 3-Tier Monthly Subscription Modal with Razorpay Checkout */}
+      {/* 3-Tier Monthly Subscription Modal with Direct UPI Checkout */}
       <PricingModal
         isOpen={isPricingModalOpen}
         onClose={closePricingModal}
         userUid={currentUser.uid}
+        userEmail={currentUser.email}
         currentPlan={planTier}
+        partnerHandle={opponent.username}
         onPlanUpgraded={() => refreshSubscription()}
         isExpiredPrompt={isExpired}
       />

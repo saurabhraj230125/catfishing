@@ -7,9 +7,10 @@ import {
   PublicPondProfile, 
   GameStage, 
   PondState,
-  StealthPersona
+  StealthPersona,
+  ChatSession
 } from '@/types/pond';
-import { startPondMatchmaking, MatchSession } from '@/lib/matchmaker';
+import { startPondMatchmaking, checkLiveWaitingOpponents, MatchSession } from '@/lib/matchmaker';
 import { getRandomBotPersona } from '@/lib/botPersonas';
 import { signOutUser, onAuthStateChanged, auth } from '@/lib/firebase';
 import { PandaPondBackground } from '@/components/PandaPondBackground';
@@ -47,16 +48,12 @@ export default function PondGamePage() {
   const [isBite, setIsBite] = useState(false);
   const [ignoreGenderFilter, setIgnoreGenderFilter] = useState(false);
 
-  // Active chat room & opponent
-  const [activeRoom, setActiveRoom] = useState<{
-    roomId: string;
-    opponent: PublicPondProfile;
-    isBotRoom?: boolean;
-    botPersona?: StealthPersona;
-  } | null>(null);
+  // Active chat session union (Human vs Stealth Bot)
+  const [activeSession, setActiveSession] = useState<ChatSession | null>(null);
 
   const matchSessionRef = useRef<MatchSession | null>(null);
   const fallbackTimerRef = useRef<NodeJS.Timeout | null>(null);
+  const matchLockedRef = useRef<boolean>(false);
 
   // Client hydration & saved stats restoration (Persistent sign-in across refreshes)
   useEffect(() => {
@@ -183,7 +180,8 @@ export default function PondGamePage() {
     setCurrentStage('stage_4_pond_matchmaking');
     setPondState('casting');
     setIsBite(false);
-    setActiveRoom(null);
+    setActiveSession(null);
+    matchLockedRef.current = false;
     playCastSound();
     setMatchStatusText(
       bypassGender
@@ -200,9 +198,23 @@ export default function PondGamePage() {
       fallbackTimerRef.current = null;
     }
 
-    // Stealth Real-Human Priority Window (8 to 11 Seconds Random)
-    const fallbackSeconds = 8 + Math.floor(Math.random() * 4);
+    // Strict Real-Human Priority Window (10 to 13 Seconds Random)
+    const fallbackSeconds = 10 + Math.floor(Math.random() * 4);
     fallbackTimerRef.current = setTimeout(async () => {
+      if (matchLockedRef.current) return;
+
+      // Re-verify pond_queue one final time for any waiting real human
+      const hasHuman = await checkLiveWaitingOpponents(
+        profile.uid,
+        profile.presentedGender === 'boy' ? 'girl' : 'boy',
+        bypassGender
+      );
+      if (hasHuman || matchLockedRef.current) {
+        // Live human present, let real matchmaking complete
+        return;
+      }
+
+      matchLockedRef.current = true;
       if (matchSessionRef.current) {
         await matchSessionRef.current.cancel().catch(() => {});
         matchSessionRef.current = null;
@@ -214,23 +226,12 @@ export default function PondGamePage() {
       trackEvent('fish_bite_alert', { isStealth: true });
 
       const persona = getRandomBotPersona(profile.presentedGender);
-      const stealthOpponent: PublicPondProfile = {
-        uid: `stealth_${persona.username}_${Date.now()}`,
-        username: persona.username,
-        displayName: persona.displayName,
-        avatar: persona.avatar,
-        presentedGender: persona.presentedGender,
-        secretIdentity: persona.secretRole,
-        bio: persona.bio,
-        vibes: persona.vibes,
-      };
 
       setTimeout(() => {
-        setActiveRoom({
+        setActiveSession({
+          type: 'bot',
           roomId: `stealth_${Date.now()}_${Math.random().toString(36).substring(2, 7)}`,
-          opponent: stealthOpponent,
-          isBotRoom: true,
-          botPersona: persona,
+          partner: persona,
         });
         setPondState('chatting');
         setCurrentStage('stage_5_insta_chat');
@@ -245,6 +246,7 @@ export default function PondGamePage() {
             setMatchStatusText(text);
           },
           onBite: () => {
+            matchLockedRef.current = true;
             if (fallbackTimerRef.current) {
               clearTimeout(fallbackTimerRef.current);
               fallbackTimerRef.current = null;
@@ -255,12 +257,17 @@ export default function PondGamePage() {
             trackEvent('fish_bite_alert');
           },
           onMatched: (roomId, opponent) => {
+            matchLockedRef.current = true;
             if (fallbackTimerRef.current) {
               clearTimeout(fallbackTimerRef.current);
               fallbackTimerRef.current = null;
             }
             trackEvent('match_connected', { roomId });
-            setActiveRoom({ roomId, opponent });
+            setActiveSession({
+              type: 'human',
+              roomId,
+              partner: opponent,
+            });
             setPondState('chatting');
             setCurrentStage('stage_5_insta_chat');
           },
@@ -294,12 +301,13 @@ export default function PondGamePage() {
 
   // Cancel Matchmaking
   const handleCancelMatchmaking = async () => {
+    matchLockedRef.current = true;
     if (fallbackTimerRef.current) {
       clearTimeout(fallbackTimerRef.current);
       fallbackTimerRef.current = null;
     }
     if (matchSessionRef.current) {
-      await matchSessionRef.current.cancel();
+      await matchSessionRef.current.cancel().catch(() => {});
       matchSessionRef.current = null;
     }
     setPondState('idle');
@@ -310,6 +318,7 @@ export default function PondGamePage() {
   const handleNextMatch = ({ xpGained, isCorrect }: { xpGained: number; isCorrect: boolean }) => {
     if (!userProfile) return;
 
+    matchLockedRef.current = false;
     const newStreak = isCorrect ? (userProfile.streak || 0) + 1 : 0;
     const newFishCaught = (userProfile.fishCaught || 0) + 1;
     const newXp = (userProfile.xp || 0) + xpGained;
@@ -322,7 +331,7 @@ export default function PondGamePage() {
     };
 
     persistUserProfile(updatedProfile);
-    setActiveRoom(null);
+    setActiveSession(null);
     triggerMatchmaking(updatedProfile, ignoreGenderFilter);
   };
 
@@ -401,15 +410,13 @@ export default function PondGamePage() {
           />
         )}
 
-        {currentStage === 'stage_5_insta_chat' && userProfile && activeRoom && (
+        {currentStage === 'stage_5_insta_chat' && userProfile && activeSession && (
           <InstaPondChat
-            roomId={activeRoom.roomId}
+            activeSession={activeSession}
             currentUser={userProfile}
-            opponent={activeRoom.opponent}
-            isBotRoom={activeRoom.isBotRoom}
-            botPersona={activeRoom.botPersona}
             onNextMatch={handleNextMatch}
             onExit={() => {
+              setActiveSession(null);
               setPondState('idle');
               setCurrentStage('stage_2_identity_select');
             }}

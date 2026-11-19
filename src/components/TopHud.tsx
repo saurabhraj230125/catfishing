@@ -268,6 +268,7 @@ export function TopHud({ userProfile, authAccount, onSignOut, onPlanUpgraded }: 
         isOpen={isPricingModalOpen}
         onClose={() => setIsPricingModalOpen(false)}
         userUid={activeUid || 'guest'}
+        userEmail={userProfile?.email || authAccount?.email}
         currentPlan={subscription?.planTier || 'free'}
         onPlanUpgraded={handlePlanChanged}
       />

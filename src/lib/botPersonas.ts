@@ -408,3 +408,88 @@ export function getRandomBotPersona(userPresentedGender: PresentedGender): Steal
   };
 }
 
+/**
+ * Instant, context-aware Hinglish fallback engine.
+ * Guarantees that the chat never freezes even if the AI backend is unreachable or rate-limited.
+ */
+export function getGuaranteedBotFallback(
+  userMsg: string = '',
+  persona?: StealthPersona
+): { messages: string[]; shouldHeartLastUserMsg: boolean; simulateRewrite: boolean } {
+  const lower = userMsg.toLowerCase().trim();
+  const city = persona?.city || 'Delhi';
+  const name = persona?.displayName ? persona.displayName.split(' ')[0] : 'Yaar';
+
+  if (lower.includes('bot') || lower.includes('ai') || lower.includes('chatgpt') || lower.includes('robot')) {
+    const defenses = [
+      ['abe pagal hai kya 😭', 'bot kyun lag rahi hu tujhe lol'],
+      ['haan bhai main robot hu charging pe baithi hu 💀', 'sachi bata tu kiska ex hai'],
+      ['lol nice joke bro 😂', 'itna realistic bot kahan milta hai bata'],
+    ];
+    return {
+      messages: defenses[Math.floor(Math.random() * defenses.length)],
+      shouldHeartLastUserMsg: false,
+      simulateRewrite: true,
+    };
+  }
+
+  if (lower.includes('catfish') || lower.includes('fake') || lower.includes('feku')) {
+    return {
+      messages: [
+        'wait text kyu delete kar raha tha baar baar 👀',
+        'tu catfish test le raha hai na mera? pakda gaya 💀',
+      ],
+      shouldHeartLastUserMsg: false,
+      simulateRewrite: true,
+    };
+  }
+
+  if (lower.includes('kahan') || lower.includes('city') || lower.includes('where') || lower.includes('rehte')) {
+    return {
+      messages: [`${city} mein rehti hu yaar ✨`, 'tu kahan ka hai bata?'],
+      shouldHeartLastUserMsg: true,
+      simulateRewrite: false,
+    };
+  }
+
+  if (lower.includes('naam') || lower.includes('name') || lower.includes('real')) {
+    return {
+      messages: [`${name} naam hai mera babu`, 'aur tera?'],
+      shouldHeartLastUserMsg: false,
+      simulateRewrite: false,
+    };
+  }
+
+  if (lower.includes('hi') || lower.includes('hii') || lower.includes('heyy') || lower.includes('hello')) {
+    return {
+      messages: ['heyy, kya chal raha hai?', 'kisi ko dhundne aaye ho pond mein? 👀'],
+      shouldHeartLastUserMsg: true,
+      simulateRewrite: false,
+    };
+  }
+
+  if (lower.includes('cute') || lower.includes('sundar') || lower.includes('love') || lower.includes('pretty') || lower.includes('hot')) {
+    return {
+      messages: [
+        'itna sweet mat ban sugar ho jayega babu 😭',
+        'flirt skill achhi hai teri haha ✨',
+      ],
+      shouldHeartLastUserMsg: true,
+      simulateRewrite: false,
+    };
+  }
+
+  const pool = persona?.fallbackReplies || [
+    'haha sachi? mujhe laga sab yahan feku hote hain 😭',
+    'wait what, tu college mein hai ya job?',
+    'sahi bata, sach bol raha hai ya full cap? 🧢',
+    'arre lol, itna serious kyun ho raha hai bro 😂',
+  ];
+
+  return {
+    messages: [pool[Math.floor(Math.random() * pool.length)]],
+    shouldHeartLastUserMsg: Math.random() < 0.35,
+    simulateRewrite: Math.random() < 0.25,
+  };
+}
+

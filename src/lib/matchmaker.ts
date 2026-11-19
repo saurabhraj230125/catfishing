@@ -105,12 +105,15 @@ export async function startPondMatchmaking(
     let createdRoomId = '';
 
     if (!snapshot.empty) {
-      // Find candidate in memory to avoid requiring composite indexes
+      // Find candidate in memory with stale ghost tab pruning
+      const now = Date.now();
       const candidateDocs = snapshot.docs.filter((d) => {
         if (d.id === user.uid) return false;
         const data = d.data() as QueueEntry;
         if (data.uid === user.uid) return false;
         if (data.status !== 'waiting' || data.roomId) return false;
+        const hb = typeof data.lastHeartbeat === 'number' ? data.lastHeartbeat : (typeof data.createdAt === 'number' ? data.createdAt : now);
+        if (now - hb > 20000) return false; // Ignore closed/dead tabs
         if (ignoreGenderFilter || data.ignoreGenderFilter) return true;
         return data.presentedGender === oppositeGender;
       });
@@ -243,10 +246,24 @@ export async function startPondMatchmaking(
       status: 'waiting',
       roomId: null,
       ignoreGenderFilter: ignoreGenderFilter,
-      createdAt: serverTimestamp(),
+      createdAt: Date.now(),
+      lastHeartbeat: Date.now(),
     };
 
     await setDoc(userQueueDocRef, myQueueEntry);
+
+    // 4-Second Heartbeat to prevent ghost stale queue entries
+    const heartbeatInterval = setInterval(() => {
+      if (isCancelled) return;
+      updateDoc(userQueueDocRef, { lastHeartbeat: Date.now() }).catch(() => {});
+    }, 4000);
+
+    const handleBeforeUnload = () => {
+      deleteDoc(userQueueDocRef).catch(() => {});
+    };
+    if (typeof window !== 'undefined') {
+      window.addEventListener('beforeunload', handleBeforeUnload);
+    }
 
     // Active sweep while in queue: auto-relaxes filter after 4s so users never wait forever
     let secondsWaiting = 0;
@@ -266,11 +283,14 @@ export async function startPondMatchmaking(
       try {
         const sweepQ = query(collection(db, 'pond_queue'), where('status', '==', 'waiting'), limit(10));
         const sweepSnap = await getDocs(sweepQ);
+        const sweepNow = Date.now();
         const candidates = sweepSnap.docs.filter((d) => {
           if (d.id === user.uid) return false;
           const data = d.data() as QueueEntry;
           if (data.uid === user.uid) return false;
           if (data.status !== 'waiting' || data.roomId) return false;
+          const hb = typeof data.lastHeartbeat === 'number' ? data.lastHeartbeat : (typeof data.createdAt === 'number' ? data.createdAt : sweepNow);
+          if (sweepNow - hb > 20000) return false; // Ignore closed/dead tabs
           if (autoBypassFilter || data.ignoreGenderFilter) return true;
           return data.presentedGender === oppositeGender;
         });
@@ -332,6 +352,10 @@ export async function startPondMatchmaking(
           });
 
           clearInterval(sweepInterval);
+          clearInterval(heartbeatInterval);
+          if (typeof window !== 'undefined') {
+            window.removeEventListener('beforeunload', handleBeforeUnload);
+          }
           callbacks.onBite();
           callbacks.onStatusUpdate(`Machhli fas gayi! Connected with @${candidateData.profile.username}...`);
 
@@ -361,6 +385,10 @@ export async function startPondMatchmaking(
 
       if (data.status === 'matched' && data.roomId) {
         clearInterval(sweepInterval);
+        clearInterval(heartbeatInterval);
+        if (typeof window !== 'undefined') {
+          window.removeEventListener('beforeunload', handleBeforeUnload);
+        }
         callbacks.onBite();
         callbacks.onStatusUpdate('Bite on the line! Reeling in live partner...');
 
@@ -388,6 +416,10 @@ export async function startPondMatchmaking(
       cancel: async () => {
         isCancelled = true;
         clearInterval(sweepInterval);
+        clearInterval(heartbeatInterval);
+        if (typeof window !== 'undefined') {
+          window.removeEventListener('beforeunload', handleBeforeUnload);
+        }
         unsubscribe();
         await deleteDoc(userQueueDocRef).catch(() => {});
       },
@@ -410,11 +442,50 @@ export interface RoomSubscriptionCallbacks {
   onTypingTelemetry: (opponentUid: string, isTyping: boolean, backspaces: number) => void;
 }
 
+/**
+ * Check if any live human of opposite gender is waiting in pond_queue.
+ * Used before falling back to stealth partner to guarantee 100% real human priority.
+ */
+export async function checkLiveWaitingOpponents(
+  currentUserUid: string,
+  oppositeGender: PresentedGender,
+  ignoreGenderFilter: boolean = false
+): Promise<boolean> {
+  if (!isLiveFirebaseConfigured) return false;
+  try {
+    const queueCollection = collection(db, 'pond_queue');
+    const q = query(
+      queueCollection,
+      where('status', '==', 'waiting'),
+      limit(10)
+    );
+    const snap = await getDocs(q);
+    const now = Date.now();
+    const liveOpponents = snap.docs.filter((d) => {
+      if (d.id === currentUserUid) return false;
+      const data = d.data() as QueueEntry;
+      if (data.uid === currentUserUid || data.status !== 'waiting' || data.roomId) return false;
+      const heartbeat = typeof data.lastHeartbeat === 'number' ? data.lastHeartbeat : (typeof data.createdAt === 'number' ? data.createdAt : now);
+      if (now - heartbeat > 20000) return false;
+      if (ignoreGenderFilter || data.ignoreGenderFilter) return true;
+      return data.presentedGender === oppositeGender;
+    });
+    return liveOpponents.length > 0;
+  } catch {
+    return false;
+  }
+}
+
 export function subscribeToChatRoom(
   roomId: string,
   currentUserId: string,
   callbacks: RoomSubscriptionCallbacks
 ): () => void {
+  // Never attach Firestore listeners to synthetic stealth rooms
+  if (roomId.startsWith('stealth_')) {
+    return () => {};
+  }
+
   if (!isLiveFirebaseConfigured) {
     return subscribeToLocalRoom(roomId, currentUserId, callbacks);
   }
@@ -470,6 +541,7 @@ export async function sendChatMessage(
   senderUid: string,
   text: string
 ): Promise<void> {
+  if (roomId.startsWith('stealth_')) return;
   const clean = text.trim();
   if (!clean) return;
 
@@ -499,6 +571,7 @@ export async function toggleMessageHeart(
   messageId: string,
   currentHearted: boolean
 ): Promise<void> {
+  if (roomId.startsWith('stealth_')) return;
   if (!isLiveFirebaseConfigured) {
     toggleLocalMessageHeart(roomId, messageId, !currentHearted);
     return;
@@ -516,6 +589,7 @@ export async function setMessageReaction(
   messageId: string,
   emoji: string
 ): Promise<void> {
+  if (roomId.startsWith('stealth_')) return;
   if (!isLiveFirebaseConfigured) {
     setMessageLocalReaction(roomId, messageId, emoji);
     return;
@@ -534,6 +608,7 @@ export async function updateTypingTelemetry(
   isTyping: boolean,
   backspaces: number
 ): Promise<void> {
+  if (roomId.startsWith('stealth_')) return;
   if (!isLiveFirebaseConfigured) {
     sendLocalTelemetry(roomId, userId, isTyping, backspaces);
     return;
@@ -547,6 +622,7 @@ export async function updateTypingTelemetry(
 }
 
 export async function leaveChatRoom(roomId: string, userId: string): Promise<void> {
+  if (roomId.startsWith('stealth_')) return;
   if (!isLiveFirebaseConfigured) {
     leaveLocalRoom(roomId, userId);
     return;
